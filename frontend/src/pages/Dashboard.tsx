@@ -1,8 +1,30 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Cpu, MemoryStick, HardDrive, Activity, Monitor, Thermometer, Clock, Zap } from "lucide-react";
+import { Cpu, MemoryStick, HardDrive, Activity, Monitor, Clock, Zap } from "lucide-react";
 import StatCard from "../components/StatCard";
 import HealthScore from "../components/HealthScore";
+
+interface RAMModule {
+  manufacturer: string;
+  capacity: number;
+  speed: number;
+  partNumber: string;
+  formFactor: string;
+  slot: string;
+}
+
+interface GPUDetail {
+  name: string;
+  driver: string;
+  vram: number;
+}
+
+interface PhysDisk {
+  model: string;
+  size: number;
+  mediaType: string;
+  interface: string;
+}
 
 interface SystemInfo {
   os: string;
@@ -14,9 +36,12 @@ interface SystemInfo {
   ramTotal: number;
   ramUsed: number;
   ramUsage: number;
+  ramModules: RAMModule[];
   gpuName: string;
   gpuDriver: string;
-  disks: { drive: string; total: number; used: number; free: number; usagePercent: number }[];
+  gpus: GPUDetail[];
+  disks: { drive: string; total: number; used: number; free: number; usagePercent: number; fsType: string }[];
+  physDisks: PhysDisk[];
   uptime: string;
   healthScore: number;
 }
@@ -140,6 +165,99 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Hardware Details */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="grid grid-cols-2 gap-5"
+      >
+        {/* CPU Details */}
+        <div className="bg-forge-card border border-forge-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-forge-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Cpu className="w-4 h-4" /> Processor
+          </h3>
+          <p className="text-sm text-forge-text font-medium">{info?.cpuModel ?? "..."}</p>
+          <div className="mt-2 flex gap-4 text-xs text-forge-muted">
+            <span>{info?.cpuCores ?? 0} Cores</span>
+            <span>{info?.cpuThreads ?? 0} Threads</span>
+          </div>
+        </div>
+
+        {/* GPU Details */}
+        <div className="bg-forge-card border border-forge-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-forge-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Monitor className="w-4 h-4" /> Graphics
+          </h3>
+          {info?.gpus?.length ? (
+            <div className="space-y-3">
+              {info.gpus.map((gpu, i) => (
+                <div key={i}>
+                  <p className="text-sm text-forge-text font-medium">{gpu.name}</p>
+                  <div className="mt-1 flex gap-4 text-xs text-forge-muted">
+                    {gpu.vram > 0 && <span>VRAM: {formatBytes(gpu.vram)}</span>}
+                    {gpu.driver && <span>Driver: {gpu.driver}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-forge-muted">No GPU detected</p>
+          )}
+        </div>
+
+        {/* RAM Modules */}
+        <div className="bg-forge-card border border-forge-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-forge-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+            <MemoryStick className="w-4 h-4" /> Memory Modules
+          </h3>
+          {info?.ramModules?.length ? (
+            <div className="space-y-2">
+              {info.ramModules.map((mod, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <div>
+                    <span className="text-forge-text font-medium">{mod.slot}</span>
+                    <span className="text-forge-muted ml-2 text-xs">
+                      {mod.manufacturer}{mod.partNumber ? ` — ${mod.partNumber.trim()}` : ""}
+                    </span>
+                  </div>
+                  <div className="flex gap-3 text-xs text-forge-muted">
+                    <span>{formatBytes(mod.capacity)}</span>
+                    {mod.speed > 0 && <span>{mod.speed} MHz</span>}
+                    <span>{mod.formFactor}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-forge-muted">No module data available</p>
+          )}
+        </div>
+
+        {/* Physical Disks */}
+        <div className="bg-forge-card border border-forge-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-forge-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+            <HardDrive className="w-4 h-4" /> Physical Drives
+          </h3>
+          {info?.physDisks?.length ? (
+            <div className="space-y-2">
+              {info.physDisks.map((d, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="text-forge-text font-medium">{d.model}</span>
+                  <div className="flex gap-3 text-xs text-forge-muted">
+                    <span>{formatBytes(d.size)}</span>
+                    <span>{d.mediaType}</span>
+                    <span>{d.interface}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-forge-muted">No drive data available</p>
+          )}
+        </div>
+      </motion.div>
+
       {/* Disk Usage */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -147,7 +265,7 @@ export default function Dashboard() {
         transition={{ delay: 0.3 }}
       >
         <h3 className="text-sm font-semibold text-forge-muted uppercase tracking-wider mb-3 flex items-center gap-2">
-          <HardDrive className="w-4 h-4" /> Storage
+          <HardDrive className="w-4 h-4" /> Storage Partitions
         </h3>
         <div className="grid grid-cols-4 gap-4">
           {info?.disks?.map((disk) => (

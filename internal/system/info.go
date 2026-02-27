@@ -15,21 +15,49 @@ import (
 
 // SystemInfo holds comprehensive system information for the Dashboard.
 type SystemInfo struct {
-	OS         string  `json:"os"`
-	Hostname   string  `json:"hostname"`
-	Platform   string  `json:"platform"`
-	CPUModel   string  `json:"cpuModel"`
-	CPUCores   int     `json:"cpuCores"`
-	CPUThreads int     `json:"cpuThreads"`
-	CPUUsage   float64 `json:"cpuUsage"`
-	RAMTotal   uint64  `json:"ramTotal"`
-	RAMUsed    uint64  `json:"ramUsed"`
-	RAMUsage   float64 `json:"ramUsage"`
-	GPUName    string  `json:"gpuName"`
-	GPUDriver  string  `json:"gpuDriver"`
-	Disks      []DiskInfo `json:"disks"`
-	Uptime     string  `json:"uptime"`
-	HealthScore int    `json:"healthScore"`
+	OS          string     `json:"os"`
+	Hostname    string     `json:"hostname"`
+	Platform    string     `json:"platform"`
+	CPUModel    string     `json:"cpuModel"`
+	CPUCores    int        `json:"cpuCores"`
+	CPUThreads  int        `json:"cpuThreads"`
+	CPUUsage    float64    `json:"cpuUsage"`
+	RAMTotal    uint64     `json:"ramTotal"`
+	RAMUsed     uint64     `json:"ramUsed"`
+	RAMUsage    float64    `json:"ramUsage"`
+	RAMModules  []RAMModule `json:"ramModules"`
+	GPUName     string     `json:"gpuName"`
+	GPUDriver   string     `json:"gpuDriver"`
+	GPUs        []GPUDetail `json:"gpus"`
+	Disks       []DiskInfo `json:"disks"`
+	PhysDisks   []PhysDisk `json:"physDisks"`
+	Uptime      string     `json:"uptime"`
+	HealthScore int        `json:"healthScore"`
+}
+
+// RAMModule represents a single physical memory stick.
+type RAMModule struct {
+	Manufacturer string `json:"manufacturer"`
+	Capacity     uint64 `json:"capacity"`
+	Speed        uint32 `json:"speed"`
+	PartNumber   string `json:"partNumber"`
+	FormFactor   string `json:"formFactor"`
+	Slot         string `json:"slot"`
+}
+
+// GPUDetail represents a single GPU adapter.
+type GPUDetail struct {
+	Name    string `json:"name"`
+	Driver  string `json:"driver"`
+	VRAM    uint64 `json:"vram"`
+}
+
+// PhysDisk represents a physical disk drive.
+type PhysDisk struct {
+	Model     string `json:"model"`
+	Size      uint64 `json:"size"`
+	MediaType string `json:"mediaType"`
+	Interface string `json:"interface"`
 }
 
 // DiskInfo holds usage information for a single disk partition.
@@ -84,14 +112,19 @@ func GetSystemInfo() (*SystemInfo, error) {
 		info.RAMUsage = ramInfo.UsedPercent
 	}
 
+	// RAM modules
+	info.RAMModules = GetRAMModules()
+
 	// GPU info
 	info.GPUName, info.GPUDriver = GetGPUInfo()
+	info.GPUs = GetGPUDetails()
 
 	// Disk info
 	disks, err := GetDiskUsage()
 	if err == nil {
 		info.Disks = disks
 	}
+	info.PhysDisks = GetPhysicalDisks()
 
 	// Uptime
 	uptimeSecs, err := host.Uptime()
@@ -188,6 +221,132 @@ func GetGPUInfo() (name string, driver string) {
 
 	// If no discrete GPU found, return the last parsed values (likely integrated)
 	return name, driver
+}
+
+// GetRAMModules queries individual RAM sticks via WMI.
+func GetRAMModules() []RAMModule {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	out, err := cmd.Hidden("wmic", "memorychip", "get", "Manufacturer,Capacity,Speed,PartNumber,DeviceLocator,FormFactor", "/format:csv").Output()
+	if err != nil {
+		return nil
+	}
+
+	var modules []RAMModule
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Node") {
+			continue
+		}
+		// CSV: Node,Capacity,DeviceLocator,FormFactor,Manufacturer,PartNumber,Speed
+		parts := strings.Split(line, ",")
+		if len(parts) < 7 {
+			continue
+		}
+		var capacity uint64
+		fmt.Sscan(strings.TrimSpace(parts[1]), &capacity)
+		var speed uint32
+		fmt.Sscan(strings.TrimSpace(parts[6]), &speed)
+		var formFactorNum int
+		fmt.Sscan(strings.TrimSpace(parts[3]), &formFactorNum)
+
+		ff := "Unknown"
+		switch formFactorNum {
+		case 8:
+			ff = "DIMM"
+		case 12:
+			ff = "SO-DIMM"
+		}
+
+		modules = append(modules, RAMModule{
+			Manufacturer: strings.TrimSpace(parts[4]),
+			Capacity:     capacity,
+			Speed:        speed,
+			PartNumber:   strings.TrimSpace(parts[5]),
+			Slot:         strings.TrimSpace(parts[2]),
+			FormFactor:   ff,
+		})
+	}
+	return modules
+}
+
+// GetGPUDetails queries all GPU adapters with VRAM info via WMI.
+func GetGPUDetails() []GPUDetail {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	out, err := cmd.Hidden("wmic", "path", "win32_VideoController", "get", "Name,DriverVersion,AdapterRAM", "/format:csv").Output()
+	if err != nil {
+		return nil
+	}
+
+	var gpus []GPUDetail
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Node") {
+			continue
+		}
+		// CSV: Node,AdapterRAM,DriverVersion,Name
+		parts := strings.Split(line, ",")
+		if len(parts) < 4 {
+			continue
+		}
+		var vram uint64
+		fmt.Sscan(strings.TrimSpace(parts[1]), &vram)
+
+		gpus = append(gpus, GPUDetail{
+			Name:   strings.TrimSpace(parts[3]),
+			Driver: strings.TrimSpace(parts[2]),
+			VRAM:   vram,
+		})
+	}
+	return gpus
+}
+
+// GetPhysicalDisks queries physical disk drives via WMI (model, size, type).
+func GetPhysicalDisks() []PhysDisk {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	out, err := cmd.Hidden("wmic", "diskdrive", "get", "Model,Size,MediaType,InterfaceType", "/format:csv").Output()
+	if err != nil {
+		return nil
+	}
+
+	var disks []PhysDisk
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Node") {
+			continue
+		}
+		// CSV: Node,InterfaceType,MediaType,Model,Size
+		parts := strings.Split(line, ",")
+		if len(parts) < 5 {
+			continue
+		}
+		var size uint64
+		fmt.Sscan(strings.TrimSpace(parts[4]), &size)
+
+		mediaType := strings.TrimSpace(parts[2])
+		if mediaType == "" {
+			mediaType = "SSD"
+		}
+
+		disks = append(disks, PhysDisk{
+			Model:     strings.TrimSpace(parts[3]),
+			Size:      size,
+			MediaType: mediaType,
+			Interface: strings.TrimSpace(parts[1]),
+		})
+	}
+	return disks
 }
 
 // CalculateHealthScore computes a system health score from 0 to 100 based on
