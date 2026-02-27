@@ -57,6 +57,8 @@ export default function GameBoost() {
   const [applying, setApplying] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [showTweaks, setShowTweaks] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [restoredMsg, setRestoredMsg] = useState(false);
 
   useEffect(() => {
     loadGPU();
@@ -83,10 +85,14 @@ export default function GameBoost() {
   async function applyBoost() {
     if (!selectedProfile) return;
     setApplying(true);
+    setSuccessMsg(null);
+    setRestoredMsg(false);
     try {
       // @ts-ignore
       await window.go.main.App.ApplyGameProfile(selectedProfile);
       await loadStatus();
+      const profileName = profiles.find((p) => p.id === selectedProfile)?.name ?? selectedProfile;
+      setSuccessMsg(`${profileName} applied successfully! Your system is now optimized for gaming.`);
     } catch (e) {
       console.error("Boost failed:", e);
     }
@@ -95,11 +101,14 @@ export default function GameBoost() {
 
   async function restoreAll() {
     setRestoring(true);
+    setSuccessMsg(null);
+    setRestoredMsg(false);
     try {
       // @ts-ignore
       await window.go.main.App.RestoreGameSettings();
       setStatus(null);
       setSelectedProfile(null);
+      setRestoredMsg(true);
     } catch (e) {
       console.error("Restore failed:", e);
     }
@@ -211,13 +220,46 @@ export default function GameBoost() {
             whileTap={{ scale: 0.98 }}
             onClick={restoreAll}
             disabled={restoring}
-            className="flex items-center gap-2 px-5 py-2.5 bg-forge-card border border-forge-border text-forge-muted rounded-lg text-sm font-medium hover:text-forge-text transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 bg-forge-card border border-forge-danger/30 text-forge-danger rounded-lg text-sm font-medium hover:bg-forge-danger/10 transition-colors disabled:opacity-50"
           >
             {restoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            Restore Original
+            Restore Original Settings
           </motion.button>
         )}
       </div>
+
+      {/* Success / Restored Messages */}
+      <AnimatePresence>
+        {successMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="bg-forge-accent/10 border border-forge-accent/30 rounded-lg p-4 flex items-start gap-3"
+          >
+            <CheckCircle2 className="w-5 h-5 text-forge-accent shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-forge-accent">{successMsg}</p>
+              <p className="text-xs text-forge-muted mt-1">
+                You can revert all changes at any time using the "Restore Original Settings" button above.
+              </p>
+            </div>
+          </motion.div>
+        )}
+        {restoredMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="bg-forge-info/10 border border-forge-info/30 rounded-lg p-4 flex items-center gap-3"
+          >
+            <CheckCircle2 className="w-5 h-5 text-forge-info shrink-0" />
+            <p className="text-sm font-semibold text-forge-info">
+              Original settings restored successfully. All tweaks have been reverted.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Tweaks Detail */}
       <div>

@@ -83,73 +83,86 @@ func GetNetworkStatus() (*NetworkStatus, error) {
 		Adapter: adapter,
 	}
 
-	// Parse netsh output for the active adapter
-	out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config", "name="+adapter).CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get network config: %w", err)
-	}
-
-	output := string(out)
-	lines := strings.Split(output, "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		if strings.Contains(line, "IP Address") || strings.Contains(line, "IP address") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				status.IPAddress = strings.TrimSpace(parts[1])
-			}
+	// Use PowerShell to get IP and gateway (locale-independent)
+	psIP := fmt.Sprintf(`Get-NetIPConfiguration -InterfaceAlias '%s' -ErrorAction SilentlyContinue | ForEach-Object { "$($_.IPv4Address.IPAddress)|$($_.IPv4DefaultGateway.NextHop)" }`, adapter)
+	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psIP).Output(); err == nil {
+		parts := strings.SplitN(strings.TrimSpace(string(out)), "|", 2)
+		if len(parts) >= 1 {
+			status.IPAddress = strings.TrimSpace(parts[0])
 		}
-
-		if strings.Contains(line, "Default Gateway") || strings.Contains(line, "Default gateway") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				gw := strings.TrimSpace(parts[1])
-				if gw != "" {
-					status.Gateway = gw
-				}
-			}
-		}
-
-		if strings.Contains(line, "DNS") && strings.Contains(line, "Servers") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				dns := strings.TrimSpace(parts[1])
-				if dns != "" {
-					status.CurrentDNS = dns
-				}
-			}
+		if len(parts) >= 2 {
+			status.Gateway = strings.TrimSpace(parts[1])
 		}
 	}
 
-	// If DNS was not found in the config line, look for statically configured DNS
-	if status.CurrentDNS == "" {
-		// Try parsing DNS lines that appear after the DNS Servers header
-		inDNS := false
-		for _, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if strings.Contains(trimmed, "DNS") && strings.Contains(trimmed, "Servers") {
-				parts := strings.SplitN(trimmed, ":", 2)
-				if len(parts) == 2 {
-					dns := strings.TrimSpace(parts[1])
-					if dns != "" {
-						status.CurrentDNS = dns
+	// Use PowerShell to get DNS servers (locale-independent)
+	psDNS := fmt.Sprintf(`(Get-DnsClientServerAddress -InterfaceAlias '%s' -AddressFamily IPv4 -ErrorAction SilentlyContinue).ServerAddresses -join ', '`, adapter)
+	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psDNS).Output(); err == nil {
+		dns := strings.TrimSpace(string(out))
+		if dns != "" {
+			status.CurrentDNS = dns
+		}
+	}
+
+	// Fallback: try netsh parsing with multi-locale support if PowerShell failed
+	if status.IPAddress == "" || status.CurrentDNS == "" {
+		if out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config", "name="+adapter).CombinedOutput(); err == nil {
+			lines := strings.Split(string(out), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				lower := strings.ToLower(line)
+
+				// IP Address (EN: "IP Address", PT: "Endereço IP", ES: "Dirección IP")
+				if status.IPAddress == "" && (strings.Contains(lower, "ip") && (strings.Contains(lower, "address") || strings.Contains(lower, "endere"))) {
+					parts := strings.SplitN(line, ":", 2)
+					if len(parts) == 2 {
+						ip := strings.TrimSpace(parts[1])
+						if net.ParseIP(ip) != nil {
+							status.IPAddress = ip
+						}
 					}
 				}
-				inDNS = true
-				continue
-			}
-			if inDNS {
-				// Continuation lines for DNS servers are indented IP addresses
-				if net.ParseIP(trimmed) != nil {
-					if status.CurrentDNS != "" {
-						status.CurrentDNS += ", " + trimmed
-					} else {
-						status.CurrentDNS = trimmed
+
+				// Gateway (EN: "Default Gateway", PT: "Gateway Padrão")
+				if status.Gateway == "" && strings.Contains(lower, "gateway") {
+					parts := strings.SplitN(line, ":", 2)
+					if len(parts) == 2 {
+						gw := strings.TrimSpace(parts[1])
+						if gw != "" {
+							status.Gateway = gw
+						}
 					}
-				} else {
-					inDNS = false
+				}
+
+				// DNS (EN: "DNS Servers", PT: "Servidores DNS")
+				if status.CurrentDNS == "" && strings.Contains(lower, "dns") {
+					parts := strings.SplitN(line, ":", 2)
+					if len(parts) == 2 {
+						dns := strings.TrimSpace(parts[1])
+						if net.ParseIP(dns) != nil {
+							status.CurrentDNS = dns
+						}
+					}
+				}
+			}
+
+			// Collect continuation DNS lines (indented IPs after DNS header)
+			if status.CurrentDNS != "" {
+				inDNS := false
+				for _, line := range lines {
+					trimmed := strings.TrimSpace(line)
+					lower := strings.ToLower(trimmed)
+					if strings.Contains(lower, "dns") {
+						inDNS = true
+						continue
+					}
+					if inDNS {
+						if net.ParseIP(trimmed) != nil {
+							status.CurrentDNS += ", " + trimmed
+						} else {
+							inDNS = false
+						}
+					}
 				}
 			}
 		}
