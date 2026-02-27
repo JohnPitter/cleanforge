@@ -146,11 +146,11 @@ export default function Network() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    // Safety timeout: if backend hangs >15s, clear spinner and show error
+    // Safety timeout: longer to allow UAC prompt interaction
     const timeout = setTimeout(() => {
       setApplying(null);
-      setErrorMsg("DNS change timed out. Try running as Administrator.");
-    }, 15000);
+      setErrorMsg("DNS change timed out.");
+    }, 35000);
 
     try {
       // @ts-ignore
@@ -173,8 +173,8 @@ export default function Network() {
 
     const timeout = setTimeout(() => {
       setApplying(null);
-      setErrorMsg("DNS reset timed out. Try running as Administrator.");
-    }, 15000);
+      setErrorMsg("DNS reset timed out.");
+    }, 35000);
 
     try {
       // @ts-ignore

@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"regexp"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 
 	"cleanforge/internal/cmd"
 	"golang.org/x/sys/windows/registry"
@@ -23,6 +25,32 @@ var (
 
 // cmdTimeout is the default timeout for PowerShell/netsh commands.
 const cmdTimeout = 10 * time.Second
+
+// elevatedTimeout is a longer timeout for commands that trigger UAC prompts.
+const elevatedTimeout = 30 * time.Second
+
+// encodePSCommand encodes a PowerShell command as UTF-16LE Base64 for use with
+// -EncodedCommand. This avoids all quoting/escaping issues with nested commands.
+func encodePSCommand(psCommand string) string {
+	runes := utf16.Encode([]rune(psCommand))
+	b := make([]byte, len(runes)*2)
+	for i, r := range runes {
+		b[i*2] = byte(r)
+		b[i*2+1] = byte(r >> 8)
+	}
+	return base64.StdEncoding.EncodeToString(b)
+}
+
+// runElevated runs a PowerShell command with UAC elevation (Start-Process -Verb RunAs).
+// Uses -EncodedCommand to avoid quoting issues. Triggers a UAC prompt for the user.
+func runElevated(ctx context.Context, psCommand string) ([]byte, error) {
+	encoded := encodePSCommand(psCommand)
+	elevateCmd := fmt.Sprintf(
+		`Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile -EncodedCommand %s'`,
+		encoded,
+	)
+	return cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", elevateCmd).CombinedOutput()
+}
 
 func getCachedAdapter() string {
 	cachedAdapterMu.RLock()
@@ -216,78 +244,57 @@ func getAdapter() (string, error) {
 }
 
 // SetDNS applies the given DNS preset to the active network adapter.
-// Uses PowerShell Set-DnsClientServerAddress (locale-independent, no admin needed).
-// Falls back to netsh via cmd /C (to avoid Go arg escaping issues with adapter names containing spaces).
+// Tries non-elevated PowerShell first; if it needs admin, triggers UAC elevation.
 func SetDNS(preset DNSPreset) error {
 	adapter, err := getAdapter()
 	if err != nil {
 		return fmt.Errorf("no active network adapter found: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
-	defer cancel()
-
-	// Primary: PowerShell Set-DnsClientServerAddress (locale-independent, works without admin)
-	psCmd := fmt.Sprintf(
+	dnsCmd := fmt.Sprintf(
 		`Set-DnsClientServerAddress -InterfaceAlias '%s' -ServerAddresses @('%s','%s')`,
 		adapter, preset.Primary, preset.Secondary,
 	)
-	if out, psErr := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).CombinedOutput(); psErr == nil {
+
+	// Try non-elevated first
+	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel()
+	if _, psErr := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", dnsCmd).CombinedOutput(); psErr == nil {
 		return nil
-	} else {
-		_ = out // PowerShell failed, try netsh fallback
 	}
 
-	// Fallback: netsh via cmd /C to avoid Go's arg escaping mangling the adapter name
-	ctx2, cancel2 := context.WithTimeout(context.Background(), cmdTimeout)
+	// Needs elevation — trigger UAC prompt
+	ctx2, cancel2 := context.WithTimeout(context.Background(), elevatedTimeout)
 	defer cancel2()
-
-	// Set primary DNS
-	netshCmd1 := fmt.Sprintf(`netsh interface ip set dns name="%s" static %s`, adapter, preset.Primary)
-	out, err := cmd.HiddenContext(ctx2, "cmd", "/C", netshCmd1).CombinedOutput()
+	out, err := runElevated(ctx2, dnsCmd)
 	if err != nil {
 		return fmt.Errorf("failed to set DNS: %s - %w", strings.TrimSpace(string(out)), err)
-	}
-
-	ctx3, cancel3 := context.WithTimeout(context.Background(), cmdTimeout)
-	defer cancel3()
-
-	// Set secondary DNS
-	netshCmd2 := fmt.Sprintf(`netsh interface ip add dns name="%s" %s index=2`, adapter, preset.Secondary)
-	out, err = cmd.HiddenContext(ctx3, "cmd", "/C", netshCmd2).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to set secondary DNS: %s - %w", strings.TrimSpace(string(out)), err)
 	}
 
 	return nil
 }
 
 // ResetDNS resets the DNS configuration to DHCP (automatic) for the active adapter.
-// Uses PowerShell Set-DnsClientServerAddress -ResetServerAddresses (locale-independent).
-// Falls back to netsh via cmd /C (to avoid Go arg escaping issues with adapter names containing spaces).
+// Tries non-elevated PowerShell first; if it needs admin, triggers UAC elevation.
 func ResetDNS() error {
 	adapter, err := getAdapter()
 	if err != nil {
 		return fmt.Errorf("no active network adapter found: %w", err)
 	}
 
+	dnsCmd := fmt.Sprintf(`Set-DnsClientServerAddress -InterfaceAlias '%s' -ResetServerAddresses`, adapter)
+
+	// Try non-elevated first
 	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
 	defer cancel()
-
-	// Primary: PowerShell (locale-independent, works without admin)
-	psCmd := fmt.Sprintf(`Set-DnsClientServerAddress -InterfaceAlias '%s' -ResetServerAddresses`, adapter)
-	if out, psErr := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).CombinedOutput(); psErr == nil {
+	if _, psErr := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", dnsCmd).CombinedOutput(); psErr == nil {
 		return nil
-	} else {
-		_ = out // PowerShell failed, try netsh fallback
 	}
 
-	// Fallback: netsh via cmd /C
-	ctx2, cancel2 := context.WithTimeout(context.Background(), cmdTimeout)
+	// Needs elevation — trigger UAC prompt
+	ctx2, cancel2 := context.WithTimeout(context.Background(), elevatedTimeout)
 	defer cancel2()
-
-	netshCmd := fmt.Sprintf(`netsh interface ip set dns name="%s" dhcp`, adapter)
-	out, err := cmd.HiddenContext(ctx2, "cmd", "/C", netshCmd).CombinedOutput()
+	out, err := runElevated(ctx2, dnsCmd)
 	if err != nil {
 		return fmt.Errorf("failed to reset DNS to DHCP: %s - %w", strings.TrimSpace(string(out)), err)
 	}

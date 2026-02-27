@@ -40,6 +40,55 @@ const tools = [
   { id: "wu_repair", name: "Repair Windows Update", desc: "Fix stuck Windows updates", icon: Package, color: "text-green-400", admin: true },
 ];
 
+function SkeletonPulse({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse bg-forge-border/50 rounded ${className}`} />;
+}
+
+function ToolkitSkeleton() {
+  return (
+    <div className="p-6 space-y-6 overflow-y-auto h-full">
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <SkeletonPulse className="w-6 h-6 rounded" />
+          <SkeletonPulse className="h-7 w-32" />
+        </div>
+        <SkeletonPulse className="h-3.5 w-72 mt-2" />
+      </div>
+
+      {/* Admin banner placeholder */}
+      <SkeletonPulse className="h-14 w-full rounded-xl" />
+
+      {/* Repair Tools section */}
+      <div>
+        <SkeletonPulse className="h-3.5 w-24 mb-3" />
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="p-4 bg-forge-card border border-forge-border rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <SkeletonPulse className="w-5 h-5 rounded" />
+                <SkeletonPulse className="h-4 w-28" />
+              </div>
+              <SkeletonPulse className="h-3 w-40" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bloatware section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <SkeletonPulse className="w-4 h-4 rounded" />
+            <SkeletonPulse className="h-3.5 w-36" />
+          </div>
+          <SkeletonPulse className="h-3.5 w-28" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Toolkit() {
   const [running, setRunning] = useState<string | null>(null);
   const [results, setResults] = useState<Map<string, ToolResult>>(new Map());
@@ -112,6 +161,8 @@ export default function Toolkit() {
     else next.add(pkg);
     setSelectedBloat(next);
   }
+
+  if (isAdmin === null) return <ToolkitSkeleton />;
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
