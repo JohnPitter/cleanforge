@@ -395,7 +395,7 @@ func RebuildFontCache() (*ToolResult, error) {
 	}
 
 	// Also stop the Font Cache 3.0.0.0 service
-	out, err = exec.Command("net", "stop", "FontCache3.0.0.0").CombinedOutput()
+	_, err = exec.Command("net", "stop", "FontCache3.0.0.0").CombinedOutput()
 	if err != nil {
 		// This service might not exist on all systems; non-critical
 		outputs = append(outputs, "FontCache 3.0.0.0 service not found or already stopped")

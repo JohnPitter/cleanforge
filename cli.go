@@ -447,8 +447,15 @@ func cliToolkit(green, yellow, red *color.Color) {
 			pkgs = append(pkgs, a.PackageName)
 		}
 		confirm := promptui.Prompt{Label: "Remove all bloatware", IsConfirm: true}
-		if _, err := confirm.Run(); err == nil {
+		if _, cerr := confirm.Run(); cerr == nil {
 			result, err = toolkit.RemoveBloatware(pkgs)
+			if err != nil {
+				red.Printf("  Error: %v\n", err)
+				return
+			}
+			if result != nil && result.Success {
+				green.Printf("  ✓ %s\n", result.Output)
+			}
 		}
 		return
 	case 7:

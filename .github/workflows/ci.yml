@@ -69,6 +69,7 @@ jobs:
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
       - name: Run gosec
+        shell: bash
         run: gosec -exclude=G104,G115 -exclude-generated ./...
 
   build:
