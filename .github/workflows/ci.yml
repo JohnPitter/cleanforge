@@ -94,7 +94,7 @@ jobs:
         run: cd frontend && npm ci --legacy-peer-deps
 
       - name: Build
-        run: wails build -clean
+        run: wails build -clean -ldflags "-X main.Version=${{ github.ref_name }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

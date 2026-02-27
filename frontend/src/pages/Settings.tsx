@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Settings as SettingsIcon,
@@ -14,6 +14,12 @@ export default function Settings() {
   const [autoClean, setAutoClean] = useState(false);
   const [autoBoost, setAutoBoost] = useState(false);
   const [cleanInterval, setCleanInterval] = useState("weekly");
+  const [version, setVersion] = useState("");
+
+  useEffect(() => {
+    // @ts-ignore - Wails bindings
+    window.go?.main?.App?.GetVersion?.().then((v: string) => setVersion(v));
+  }, []);
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
@@ -101,7 +107,7 @@ export default function Settings() {
             <p className="text-lg font-bold text-forge-accent">
               CLEAN<span className="text-forge-text">FORGE</span>
             </p>
-            <p className="text-xs text-forge-muted">v1.0.0 | Open Source Performance Suite</p>
+            <p className="text-xs text-forge-muted">{version ? `v${version}` : ""} | Open Source Performance Suite</p>
           </div>
         </div>
 

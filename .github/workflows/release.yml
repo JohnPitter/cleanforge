@@ -31,13 +31,13 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && npm ci --legacy-peer-deps
 
-      - name: Build Release
-        run: wails build -clean -upx -ldflags "-s -w"
-
       - name: Get version
         id: version
         shell: bash
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build Release
+        run: wails build -clean -upx -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }}"
 
       - name: Rename artifact
         run: |

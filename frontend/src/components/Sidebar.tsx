@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -24,6 +25,13 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const [version, setVersion] = useState("");
+
+  useEffect(() => {
+    // @ts-ignore - Wails bindings
+    window.go?.main?.App?.GetVersion?.().then((v: string) => setVersion(v));
+  }, []);
+
   return (
     <aside className="w-56 h-screen bg-forge-surface border-r border-forge-border flex flex-col shrink-0">
       <div className="p-5 border-b border-forge-border">
@@ -76,7 +84,7 @@ export default function Sidebar() {
 
       <div className="p-4 border-t border-forge-border">
         <p className="text-[10px] text-forge-muted text-center">
-          CleanForge v1.0.0
+          CleanForge {version ? `v${version}` : ""}
         </p>
       </div>
     </aside>
