@@ -56,7 +56,7 @@ export default function Cleaner() {
       // @ts-ignore
       const result = await window.go.main.App.ScanSystem();
       setScanResult(result);
-      const safeIds = new Set(
+      const safeIds = new Set<string>(
         result.categories.filter((c: CleanCategory) => c.risk === "safe" && c.size > 0).map((c: CleanCategory) => c.id)
       );
       setSelected(safeIds);
