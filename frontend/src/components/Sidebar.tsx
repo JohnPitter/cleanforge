@@ -33,7 +33,7 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <aside className="w-56 h-screen bg-forge-surface border-r border-forge-border flex flex-col shrink-0">
+    <aside className="w-56 h-full bg-forge-surface border-r border-forge-border flex flex-col shrink-0">
       <div className="p-5 border-b border-forge-border">
         <div className="flex items-center gap-2">
           <Flame className="w-7 h-7 text-forge-accent" />

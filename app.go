@@ -149,6 +149,10 @@ func (a *App) PingTest(host string) (float64, error) {
 // Toolkit
 // ============================================================
 
+func (a *App) GetIsAdmin() bool {
+	return toolkit.IsAdmin()
+}
+
 func (a *App) RunSFC() (*toolkit.ToolResult, error) {
 	return toolkit.RunSFC()
 }
