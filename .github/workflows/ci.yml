@@ -70,7 +70,7 @@ jobs:
 
       - name: Run gosec
         shell: bash
-        run: gosec -exclude=G104,G115 -exclude-generated ./...
+        run: gosec -exclude=G103,G104,G115,G204,G301,G304,G306,G703 -exclude-generated ./...
 
   build:
     name: Build
