@@ -3,12 +3,12 @@ package network
 import (
 	"fmt"
 	"net"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"cleanforge/internal/cmd"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -84,7 +84,7 @@ func GetNetworkStatus() (*NetworkStatus, error) {
 	}
 
 	// Parse netsh output for the active adapter
-	out, err := exec.Command("netsh", "interface", "ip", "show", "config", "name="+adapter).CombinedOutput()
+	out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config", "name="+adapter).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network config: %w", err)
 	}
@@ -169,14 +169,14 @@ func SetDNS(preset DNSPreset) error {
 	}
 
 	// Set primary DNS
-	out, err := exec.Command("netsh", "interface", "ip", "set", "dns",
+	out, err := cmd.Hidden("netsh", "interface", "ip", "set", "dns",
 		fmt.Sprintf("name=%s", adapter), "static", preset.Primary).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to set primary DNS: %s - %w", string(out), err)
 	}
 
 	// Set secondary DNS
-	out, err = exec.Command("netsh", "interface", "ip", "add", "dns",
+	out, err = cmd.Hidden("netsh", "interface", "ip", "add", "dns",
 		fmt.Sprintf("name=%s", adapter), preset.Secondary, "index=2").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to set secondary DNS: %s - %w", string(out), err)
@@ -192,7 +192,7 @@ func ResetDNS() error {
 		return fmt.Errorf("failed to get active adapter: %w", err)
 	}
 
-	out, err := exec.Command("netsh", "interface", "ip", "set", "dns",
+	out, err := cmd.Hidden("netsh", "interface", "ip", "set", "dns",
 		fmt.Sprintf("name=%s", adapter), "dhcp").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to reset DNS to DHCP: %s - %w", string(out), err)
@@ -287,9 +287,9 @@ func FlushNetwork() (string, error) {
 	var outputs []string
 	var errs []string
 
-	for _, cmd := range commands {
-		out, err := exec.Command(cmd.name, cmd.args...).CombinedOutput()
-		label := cmd.name + " " + strings.Join(cmd.args, " ")
+	for _, c := range commands {
+		out, err := cmd.Hidden(c.name, c.args...).CombinedOutput()
+		label := c.name + " " + strings.Join(c.args, " ")
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("[%s] error: %s - %s", label, err.Error(), strings.TrimSpace(string(out))))
 		} else {
@@ -311,7 +311,7 @@ func FlushNetwork() (string, error) {
 
 // GetActiveAdapter parses netsh output to find the currently active network adapter name.
 func GetActiveAdapter() (string, error) {
-	out, err := exec.Command("netsh", "interface", "ip", "show", "config").CombinedOutput()
+	out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to run netsh: %w", err)
 	}
@@ -354,7 +354,7 @@ func GetActiveAdapter() (string, error) {
 // ipconfig commands.
 func getAdapterFromRoute() (string, error) {
 	// Get the default interface IP from "route print 0.0.0.0"
-	out, err := exec.Command("route", "print", "0.0.0.0").CombinedOutput()
+	out, err := cmd.Hidden("route", "print", "0.0.0.0").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to run route print: %w", err)
 	}
@@ -377,7 +377,7 @@ func getAdapterFromRoute() (string, error) {
 	}
 
 	// Now match this IP to an adapter name from ipconfig
-	ipconfigOut, err := exec.Command("ipconfig").CombinedOutput()
+	ipconfigOut, err := cmd.Hidden("ipconfig").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to run ipconfig: %w", err)
 	}
@@ -406,7 +406,7 @@ func getAdapterFromRoute() (string, error) {
 
 // PingTest pings the specified host and returns the average latency in milliseconds.
 func PingTest(host string) (float64, error) {
-	out, err := exec.Command("ping", "-n", "4", host).CombinedOutput()
+	out, err := cmd.Hidden("ping", "-n", "4", host).CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("ping failed: %s - %w", strings.TrimSpace(string(out)), err)
 	}
@@ -515,7 +515,7 @@ func MeasureLatency() (float64, error) {
 
 	for _, host := range hosts {
 		// Use a short timeout approach: ping with -n 2 for speed
-		out, err := exec.Command("ping", "-n", "2", "-w", "2000", host).CombinedOutput()
+		out, err := cmd.Hidden("ping", "-n", "2", "-w", "2000", host).CombinedOutput()
 		if err != nil {
 			lastErr = err
 			continue
@@ -551,7 +551,7 @@ func SpeedTestBasic() (float64, error) {
 	// would require downloading a file which is beyond a simple utility.
 	// Instead we measure jitter by doing several pings.
 	start := time.Now()
-	_, err := exec.Command("ping", "-n", "10", "-w", "1000", "1.1.1.1").CombinedOutput()
+	_, err := cmd.Hidden("ping", "-n", "10", "-w", "1000", "1.1.1.1").CombinedOutput()
 	elapsed := time.Since(start)
 
 	if err != nil {

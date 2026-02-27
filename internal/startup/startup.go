@@ -3,10 +3,10 @@ package startup
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"cleanforge/internal/cmd"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -282,7 +282,7 @@ func (m *StartupManager) readStartupFolder() ([]StartupItem, error) {
 // ---------- Task Scheduler reading ----------
 
 func (m *StartupManager) readTaskSchedulerStartup() ([]StartupItem, error) {
-	out, err := exec.Command("schtasks", "/query", "/fo", "CSV", "/nh").CombinedOutput()
+	out, err := cmd.Hidden("schtasks", "/query", "/fo", "CSV", "/nh").CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("schtasks failed: %w", err)
 	}
@@ -451,11 +451,11 @@ func (m *StartupManager) enableStartupFolderItem(item StartupItem) error {
 // ---------- Disable / Enable task scheduler ----------
 
 func (m *StartupManager) disableScheduledTask(item StartupItem) error {
-	return exec.Command("schtasks", "/Change", "/TN", item.Path, "/Disable").Run()
+	return cmd.Hidden("schtasks", "/Change", "/TN", item.Path, "/Disable").Run()
 }
 
 func (m *StartupManager) enableScheduledTask(item StartupItem) error {
-	return exec.Command("schtasks", "/Change", "/TN", item.Path, "/Enable").Run()
+	return cmd.Hidden("schtasks", "/Change", "/TN", item.Path, "/Enable").Run()
 }
 
 // ---------- Helpers ----------

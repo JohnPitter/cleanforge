@@ -3,10 +3,10 @@ package toolkit
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"cleanforge/internal/cmd"
 	"golang.org/x/sys/windows"
 )
 
@@ -97,7 +97,7 @@ func RunSFC() (*ToolResult, error) {
 		return result, nil
 	}
 
-	out, err := exec.Command("sfc", "/scannow").CombinedOutput()
+	out, err := cmd.Hidden("sfc", "/scannow").CombinedOutput()
 	output := strings.TrimSpace(string(out))
 	result.Output = output
 
@@ -125,7 +125,7 @@ func RunDISM() (*ToolResult, error) {
 		return result, nil
 	}
 
-	out, err := exec.Command("DISM", "/Online", "/Cleanup-Image", "/RestoreHealth").CombinedOutput()
+	out, err := cmd.Hidden("DISM", "/Online", "/Cleanup-Image", "/RestoreHealth").CombinedOutput()
 	output := strings.TrimSpace(string(out))
 	result.Output = output
 
@@ -144,7 +144,7 @@ func RunDISM() (*ToolResult, error) {
 func GetBloatwareApps() ([]BloatwareApp, error) {
 	// Query all installed AppX packages via PowerShell
 	psCmd := `Get-AppxPackage | Select-Object Name, PackageFullName, Publisher | ConvertTo-Csv -NoTypeInformation`
-	out, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", psCmd).CombinedOutput()
+	out, err := cmd.Hidden("powershell", "-NoProfile", "-NonInteractive", "-Command", psCmd).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to query AppX packages: %s - %w", strings.TrimSpace(string(out)), err)
 	}
@@ -219,7 +219,7 @@ func RemoveBloatware(packageNames []string) (*ToolResult, error) {
 
 	for _, pkgName := range packageNames {
 		psCmd := fmt.Sprintf(`Get-AppxPackage -Name "%s" | Remove-AppxPackage`, pkgName)
-		out, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", psCmd).CombinedOutput()
+		out, err := cmd.Hidden("powershell", "-NoProfile", "-NonInteractive", "-Command", psCmd).CombinedOutput()
 		output := strings.TrimSpace(string(out))
 
 		if err != nil {
@@ -258,7 +258,7 @@ func RepairWindowsUpdate() (*ToolResult, error) {
 	var errors []string
 
 	// Stop the Windows Update service
-	out, err := exec.Command("net", "stop", "wuauserv").CombinedOutput()
+	out, err := cmd.Hidden("net", "stop", "wuauserv").CombinedOutput()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to stop wuauserv: %s - %s", err.Error(), strings.TrimSpace(string(out))))
 	} else {
@@ -266,7 +266,7 @@ func RepairWindowsUpdate() (*ToolResult, error) {
 	}
 
 	// Stop BITS service
-	out, err = exec.Command("net", "stop", "bits").CombinedOutput()
+	out, err = cmd.Hidden("net", "stop", "bits").CombinedOutput()
 	if err != nil {
 		// BITS might not be running; non-critical
 		outputs = append(outputs, fmt.Sprintf("BITS service: %s", strings.TrimSpace(string(out))))
@@ -286,7 +286,7 @@ func RepairWindowsUpdate() (*ToolResult, error) {
 	}
 
 	// Restart the Windows Update service
-	out, err = exec.Command("net", "start", "wuauserv").CombinedOutput()
+	out, err = cmd.Hidden("net", "start", "wuauserv").CombinedOutput()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to start wuauserv: %s - %s", err.Error(), strings.TrimSpace(string(out))))
 	} else {
@@ -294,7 +294,7 @@ func RepairWindowsUpdate() (*ToolResult, error) {
 	}
 
 	// Restart BITS service
-	out, err = exec.Command("net", "start", "bits").CombinedOutput()
+	out, err = cmd.Hidden("net", "start", "bits").CombinedOutput()
 	if err != nil {
 		outputs = append(outputs, fmt.Sprintf("BITS restart: %s", strings.TrimSpace(string(out))))
 	} else {
@@ -323,7 +323,7 @@ func RebuildIconCache() (*ToolResult, error) {
 	cacheDir := filepath.Join(localAppData, "Microsoft", "Windows", "Explorer")
 
 	// Kill explorer.exe first to release file handles
-	out, err := exec.Command("taskkill", "/f", "/im", "explorer.exe").CombinedOutput()
+	out, err := cmd.Hidden("taskkill", "/f", "/im", "explorer.exe").CombinedOutput()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to kill explorer.exe: %s - %s", err.Error(), strings.TrimSpace(string(out))))
 	} else {
@@ -355,7 +355,7 @@ func RebuildIconCache() (*ToolResult, error) {
 	}
 
 	// Restart explorer.exe
-	err = exec.Command("cmd", "/c", "start", "explorer.exe").Start()
+	err = cmd.Hidden("cmd", "/c", "start", "explorer.exe").Start()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to restart explorer.exe: %s", err.Error()))
 	} else {
@@ -387,7 +387,7 @@ func RebuildFontCache() (*ToolResult, error) {
 	var errors []string
 
 	// Stop Font Cache service
-	out, err := exec.Command("net", "stop", "FontCache").CombinedOutput()
+	out, err := cmd.Hidden("net", "stop", "FontCache").CombinedOutput()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to stop FontCache: %s - %s", err.Error(), strings.TrimSpace(string(out))))
 	} else {
@@ -395,7 +395,7 @@ func RebuildFontCache() (*ToolResult, error) {
 	}
 
 	// Also stop the Font Cache 3.0.0.0 service
-	_, err = exec.Command("net", "stop", "FontCache3.0.0.0").CombinedOutput()
+	_, err = cmd.Hidden("net", "stop", "FontCache3.0.0.0").CombinedOutput()
 	if err != nil {
 		// This service might not exist on all systems; non-critical
 		outputs = append(outputs, "FontCache 3.0.0.0 service not found or already stopped")
@@ -438,7 +438,7 @@ func RebuildFontCache() (*ToolResult, error) {
 	}
 
 	// Restart Font Cache service
-	out, err = exec.Command("net", "start", "FontCache").CombinedOutput()
+	out, err = cmd.Hidden("net", "start", "FontCache").CombinedOutput()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to start FontCache: %s - %s", err.Error(), strings.TrimSpace(string(out))))
 	} else {
@@ -470,7 +470,7 @@ func ResetWindowsSearch() (*ToolResult, error) {
 	var errors []string
 
 	// Stop Windows Search service
-	out, err := exec.Command("net", "stop", "WSearch").CombinedOutput()
+	out, err := cmd.Hidden("net", "stop", "WSearch").CombinedOutput()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to stop WSearch: %s - %s", err.Error(), strings.TrimSpace(string(out))))
 	} else {
@@ -493,7 +493,7 @@ func ResetWindowsSearch() (*ToolResult, error) {
 	}
 
 	// Restart Windows Search service
-	out, err = exec.Command("net", "start", "WSearch").CombinedOutput()
+	out, err = cmd.Hidden("net", "start", "WSearch").CombinedOutput()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("Failed to start WSearch: %s - %s", err.Error(), strings.TrimSpace(string(out))))
 	} else {

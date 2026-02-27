@@ -9,5 +9,12 @@
   "author": {
     "name": "Joao Pedro Tavares",
     "email": "joaopedro.ts16@gmail.com"
+  },
+  "info": {
+    "companyName": "JohnPitter",
+    "productName": "CleanForge",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright 2026 Joao Pedro Tavares. MIT License.",
+    "comments": "The Ultimate Windows Performance Suite"
   }
 }

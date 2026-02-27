@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"cleanforge/internal/gaming/profiles"
+	"cleanforge/internal/cmd"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -166,7 +166,7 @@ func NewGameBooster() *GameBooster {
 
 // DetectGPU uses wmic to detect the primary GPU and determine its vendor.
 func (g *GameBooster) DetectGPU() (*GPUInfo, error) {
-	out, err := exec.Command("wmic", "path", "win32_VideoController", "get", "Name,DriverVersion", "/format:csv").CombinedOutput()
+	out, err := cmd.Hidden("wmic", "path", "win32_VideoController", "get", "Name,DriverVersion", "/format:csv").CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("wmic failed: %w — output: %s", err, string(out))
 	}
@@ -294,7 +294,7 @@ func (g *GameBooster) backupRegistryValue(state *BackupState, root string, keyPa
 
 // backupServiceState saves whether a service is running.
 func (g *GameBooster) backupServiceState(state *BackupState, serviceName string) {
-	out, err := exec.Command("sc", "query", serviceName).CombinedOutput()
+	out, err := cmd.Hidden("sc", "query", serviceName).CombinedOutput()
 	svcState := "stopped"
 	if err == nil && strings.Contains(string(out), "RUNNING") {
 		svcState = "running"
@@ -414,7 +414,7 @@ func (g *GameBooster) RestoreOriginalState() error {
 
 		case "service":
 			if entry.ServiceState == "running" {
-				_ = exec.Command("sc", "start", entry.ServiceName).Run()
+				_ = cmd.Hidden("sc", "start", entry.ServiceName).Run()
 			}
 		}
 	}
@@ -563,10 +563,10 @@ func (g *GameBooster) applyDisableFullscreenOptimize() error {
 
 func (g *GameBooster) applyUltimatePowerPlan() error {
 	// Duplicate the Ultimate Performance plan
-	out, err := exec.Command("powercfg", "/duplicatescheme", "e9a42b02-d5df-448d-aa00-03f14749eb61").CombinedOutput()
+	out, err := cmd.Hidden("powercfg", "/duplicatescheme", "e9a42b02-d5df-448d-aa00-03f14749eb61").CombinedOutput()
 	if err != nil {
 		// Plan may already exist; try to find it
-		listOut, lerr := exec.Command("powercfg", "/list").CombinedOutput()
+		listOut, lerr := cmd.Hidden("powercfg", "/list").CombinedOutput()
 		if lerr != nil {
 			return fmt.Errorf("powercfg list failed: %w", lerr)
 		}
@@ -574,21 +574,21 @@ func (g *GameBooster) applyUltimatePowerPlan() error {
 		if guid == "" {
 			return fmt.Errorf("could not create or find ultimate performance plan: %s", string(out))
 		}
-		return exec.Command("powercfg", "/setactive", guid).Run()
+		return cmd.Hidden("powercfg", "/setactive", guid).Run()
 	}
 
 	// Parse the new GUID from output like: "Power Scheme GUID: xxxx-xxxx (Ultimate Performance)"
 	guid := parseGUIDFromPowercfg(string(out))
 	if guid == "" {
 		// Fallback: search list
-		listOut, _ := exec.Command("powercfg", "/list").CombinedOutput()
+		listOut, _ := cmd.Hidden("powercfg", "/list").CombinedOutput()
 		guid = findUltimatePlanGUID(string(listOut))
 	}
 	if guid == "" {
 		return fmt.Errorf("could not determine plan GUID from: %s", string(out))
 	}
 
-	return exec.Command("powercfg", "/setactive", guid).Run()
+	return cmd.Hidden("powercfg", "/setactive", guid).Run()
 }
 
 func parseGUIDFromPowercfg(output string) string {
@@ -650,7 +650,7 @@ func (g *GameBooster) applyCoreParking() error {
 }
 
 func (g *GameBooster) applyDisableHPET() error {
-	return exec.Command("bcdedit", "/deletevalue", "useplatformclock").Run()
+	return cmd.Hidden("bcdedit", "/deletevalue", "useplatformclock").Run()
 }
 
 func (g *GameBooster) applyTimerResolution() error {
@@ -662,11 +662,11 @@ func (g *GameBooster) applyTimerResolution() error {
 }
 
 func (g *GameBooster) applyDisableSysMain() error {
-	return exec.Command("sc", "stop", "SysMain").Run()
+	return cmd.Hidden("sc", "stop", "SysMain").Run()
 }
 
 func (g *GameBooster) applyDisableIndexing() error {
-	return exec.Command("sc", "stop", "WSearch").Run()
+	return cmd.Hidden("sc", "stop", "WSearch").Run()
 }
 
 // KillBloatware terminates known bloatware processes.
@@ -679,7 +679,7 @@ func (g *GameBooster) KillBloatware(aggressive bool) ([]string, error) {
 
 	var killed []string
 	for _, proc := range list {
-		err := exec.Command("taskkill", "/F", "/IM", proc).Run()
+		err := cmd.Hidden("taskkill", "/F", "/IM", proc).Run()
 		if err == nil {
 			killed = append(killed, proc)
 		}
@@ -716,15 +716,15 @@ func (g *GameBooster) applyDisableNagle() error {
 }
 
 func (g *GameBooster) applyDNSOptimize() error {
-	_ = exec.Command("ipconfig", "/flushdns").Run()
+	_ = cmd.Hidden("ipconfig", "/flushdns").Run()
 	return nil
 }
 
 func (g *GameBooster) applyFlushNetwork() error {
-	_ = exec.Command("ipconfig", "/flushdns").Run()
-	_ = exec.Command("nbtstat", "-R").Run()
-	_ = exec.Command("netsh", "winsock", "reset").Run()
-	_ = exec.Command("netsh", "int", "ip", "reset").Run()
+	_ = cmd.Hidden("ipconfig", "/flushdns").Run()
+	_ = cmd.Hidden("nbtstat", "-R").Run()
+	_ = cmd.Hidden("netsh", "winsock", "reset").Run()
+	_ = cmd.Hidden("netsh", "int", "ip", "reset").Run()
 	return nil
 }
 
@@ -940,8 +940,8 @@ func (g *GameBooster) RestoreAll() error {
 	}
 
 	// Re-enable services that were stopped
-	_ = exec.Command("sc", "start", "SysMain").Run()
-	_ = exec.Command("sc", "start", "WSearch").Run()
+	_ = cmd.Hidden("sc", "start", "SysMain").Run()
+	_ = cmd.Hidden("sc", "start", "WSearch").Run()
 
 	// Clear state
 	g.status = BoostStatus{}

@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"cleanforge/internal/cmd"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -152,7 +152,7 @@ func SaveRegistryValue(rootKey, path, valueName string) error {
 // SaveServiceState reads the current start type of a Windows service and saves it
 // to the in-memory backup state.
 func SaveServiceState(serviceName string) error {
-	out, err := exec.Command("sc", "qc", serviceName).Output()
+	out, err := cmd.Hidden("sc", "qc", serviceName).Output()
 	if err != nil {
 		return fmt.Errorf("failed to query service '%s': %w", serviceName, err)
 	}
@@ -169,7 +169,7 @@ func SaveServiceState(serviceName string) error {
 // SavePowerPlan reads the currently active power plan GUID and saves it to the
 // in-memory backup state.
 func SavePowerPlan() error {
-	out, err := exec.Command("powercfg", "/getactivescheme").Output()
+	out, err := cmd.Hidden("powercfg", "/getactivescheme").Output()
 	if err != nil {
 		return fmt.Errorf("failed to get active power plan: %w", err)
 	}
@@ -361,7 +361,7 @@ func RestoreServices() error {
 			continue
 		}
 
-		cmd := exec.Command("sc", "config", serviceName, "start=", scStartType)
+		cmd := cmd.Hidden("sc", "config", serviceName, "start=", scStartType)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v (%s)", serviceName, err, strings.TrimSpace(string(out))))
 		}
@@ -380,7 +380,7 @@ func RestorePowerPlan() error {
 		return nil
 	}
 
-	cmd := exec.Command("powercfg", "/setactive", state.PowerPlan)
+	cmd := cmd.Hidden("powercfg", "/setactive", state.PowerPlan)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to restore power plan %s: %v (%s)", state.PowerPlan, err, strings.TrimSpace(string(out)))
 	}

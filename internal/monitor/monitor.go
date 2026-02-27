@@ -4,12 +4,12 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"cleanforge/internal/cmd"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
@@ -88,7 +88,7 @@ func GetSnapshot() (*MonitorSnapshot, error) {
 func GetCPUTemp() (float64, error) {
 	// Method 1: MSAcpi_ThermalZoneTemperature via WMI
 	// This returns temperature in tenths of Kelvin
-	out, err := exec.Command("powershell", "-NoProfile", "-Command",
+	out, err := cmd.Hidden("powershell", "-NoProfile", "-Command",
 		"Get-CimInstance MSAcpi_ThermalZoneTemperature -Namespace root/WMI -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CurrentTemperature -First 1",
 	).Output()
 	if err == nil {
@@ -106,7 +106,7 @@ func GetCPUTemp() (float64, error) {
 	}
 
 	// Method 2: Open Hardware Monitor / LibreHardwareMonitor WMI
-	out, err = exec.Command("powershell", "-NoProfile", "-Command",
+	out, err = cmd.Hidden("powershell", "-NoProfile", "-Command",
 		`Get-CimInstance -Namespace root/OpenHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -ExpandProperty Value -First 1`,
 	).Output()
 	if err == nil {
@@ -120,7 +120,7 @@ func GetCPUTemp() (float64, error) {
 	}
 
 	// Method 3: LibreHardwareMonitor WMI namespace
-	out, err = exec.Command("powershell", "-NoProfile", "-Command",
+	out, err = cmd.Hidden("powershell", "-NoProfile", "-Command",
 		`Get-CimInstance -Namespace root/LibreHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -ExpandProperty Value -First 1`,
 	).Output()
 	if err == nil {
@@ -141,7 +141,7 @@ func GetCPUTemp() (float64, error) {
 // for AMD or other vendors.
 func GetGPUTemp() (float64, error) {
 	// Method 1: NVIDIA GPU via nvidia-smi
-	out, err := exec.Command("nvidia-smi",
+	out, err := cmd.Hidden("nvidia-smi",
 		"--query-gpu=temperature.gpu",
 		"--format=csv,noheader,nounits",
 	).Output()
@@ -158,7 +158,7 @@ func GetGPUTemp() (float64, error) {
 	}
 
 	// Method 2: Open Hardware Monitor WMI for GPU temperature
-	out, err = exec.Command("powershell", "-NoProfile", "-Command",
+	out, err = cmd.Hidden("powershell", "-NoProfile", "-Command",
 		`Get-CimInstance -Namespace root/OpenHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*GPU*' } | Select-Object -ExpandProperty Value -First 1`,
 	).Output()
 	if err == nil {
@@ -172,7 +172,7 @@ func GetGPUTemp() (float64, error) {
 	}
 
 	// Method 3: LibreHardwareMonitor WMI namespace for GPU
-	out, err = exec.Command("powershell", "-NoProfile", "-Command",
+	out, err = cmd.Hidden("powershell", "-NoProfile", "-Command",
 		`Get-CimInstance -Namespace root/LibreHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*GPU*' } | Select-Object -ExpandProperty Value -First 1`,
 	).Output()
 	if err == nil {
@@ -402,7 +402,7 @@ func getDiskUsageAverage() float64 {
 // getFanSpeed attempts to read fan speed via WMI. Returns 0 if unavailable.
 func getFanSpeed() int {
 	// Try Win32_Fan WMI class
-	out, err := exec.Command("powershell", "-NoProfile", "-Command",
+	out, err := cmd.Hidden("powershell", "-NoProfile", "-Command",
 		"Get-CimInstance Win32_Fan -ErrorAction SilentlyContinue | Select-Object -ExpandProperty DesiredSpeed -First 1",
 	).Output()
 	if err == nil {
@@ -416,7 +416,7 @@ func getFanSpeed() int {
 	}
 
 	// Try Open Hardware Monitor
-	out, err = exec.Command("powershell", "-NoProfile", "-Command",
+	out, err = cmd.Hidden("powershell", "-NoProfile", "-Command",
 		`Get-CimInstance -Namespace root/OpenHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq 'Fan' } | Select-Object -ExpandProperty Value -First 1`,
 	).Output()
 	if err == nil {

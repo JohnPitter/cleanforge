@@ -2,11 +2,11 @@ package system
 
 import (
 	"fmt"
-	"os/exec"
 	"runtime"
 	"strings"
 	"time"
 
+	"cleanforge/internal/cmd"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/host"
@@ -160,7 +160,7 @@ func GetGPUInfo() (name string, driver string) {
 		return "", ""
 	}
 
-	out, err := exec.Command("wmic", "path", "win32_VideoController", "get", "Name,DriverVersion", "/format:csv").Output()
+	out, err := cmd.Hidden("wmic", "path", "win32_VideoController", "get", "Name,DriverVersion", "/format:csv").Output()
 	if err != nil {
 		return "", ""
 	}

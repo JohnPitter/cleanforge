@@ -3,10 +3,11 @@ package cleaner
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"cleanforge/internal/cmd"
 )
 
 // CleanCategory represents a category of files that can be cleaned.
@@ -317,7 +318,7 @@ func scanDirectory(path string) (int64, int, error) {
 // using a PowerShell command.
 func scanRecycleBin() (int64, int) {
 	// Get total size
-	sizeOut, err := exec.Command("powershell", "-Command",
+	sizeOut, err := cmd.Hidden("powershell", "-Command",
 		"(New-Object -ComObject Shell.Application).NameSpace(10).Items() | Measure-Object -Property Size -Sum | Select-Object -ExpandProperty Sum").Output()
 	if err != nil {
 		return 0, 0
@@ -334,7 +335,7 @@ func scanRecycleBin() (int64, int) {
 	}
 
 	// Get item count
-	countOut, err := exec.Command("powershell", "-Command",
+	countOut, err := cmd.Hidden("powershell", "-Command",
 		"(New-Object -ComObject Shell.Application).NameSpace(10).Items() | Measure-Object | Select-Object -ExpandProperty Count").Output()
 	if err != nil {
 		return size, 0
@@ -351,7 +352,7 @@ func scanRecycleBin() (int64, int) {
 
 // scanGoCache estimates the size of the Go build cache by checking the cache directory.
 func scanGoCache() (int64, int) {
-	out, err := exec.Command("go", "env", "GOCACHE").Output()
+	out, err := cmd.Hidden("go", "env", "GOCACHE").Output()
 	if err != nil {
 		return 0, 0
 	}
@@ -376,7 +377,7 @@ func cleanRecycleBin() (int64, int, []string) {
 	// Get current size before cleaning
 	sizeBefore, countBefore := scanRecycleBin()
 
-	err := exec.Command("powershell", "-Command",
+	err := cmd.Hidden("powershell", "-Command",
 		"Clear-RecycleBin -Force -ErrorAction SilentlyContinue").Run()
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("recycle_bin: failed to clear recycle bin: %v", err))
@@ -393,7 +394,7 @@ func cleanGoCache() (int64, int, []string) {
 	// Get current size before cleaning
 	sizeBefore, countBefore := scanGoCache()
 
-	err := exec.Command("go", "clean", "-cache").Run()
+	err := cmd.Hidden("go", "clean", "-cache").Run()
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("go_cache: failed to clean go cache: %v", err))
 		return 0, 0, errs
