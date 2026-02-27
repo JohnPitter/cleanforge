@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="flame" x1="0.5" y1="1" x2="0.5" y2="0">
+      <stop offset="0%" stop-color="#00cc6a"/>
+      <stop offset="50%" stop-color="#00ff88"/>
+      <stop offset="100%" stop-color="#88ffcc"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0f"/>
+      <stop offset="100%" stop-color="#12121a"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bg)" stroke="#2a2a3e" stroke-width="4"/>
+  <!-- Inner ring -->
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+  <!-- Flame icon - main -->
+  <path filter="url(#glow)" d="M256 80c0 0-100 100-100 200c0 55.2 44.8 100 100 100s100-44.8 100-100C356 180 256 80 256 80z" fill="url(#flame)" opacity="0.9"/>
+  <!-- Flame inner detail -->
+  <path d="M256 160c0 0-50 60-50 120c0 27.6 22.4 50 50 50s50-22.4 50-50C306 220 256 160 256 160z" fill="#0a0a0f" opacity="0.4"/>
+  <!-- Spark/forge element - anvil base -->
+  <rect x="196" y="360" width="120" height="12" rx="6" fill="#00ff88" opacity="0.6"/>
+  <!-- Spark particles -->
+  <circle cx="200" cy="180" r="3" fill="#00ff88" opacity="0.8"/>
+  <circle cx="310" cy="200" r="2.5" fill="#00ff88" opacity="0.6"/>
+  <circle cx="220" cy="140" r="2" fill="#88ffcc" opacity="0.7"/>
+  <circle cx="300" cy="150" r="3.5" fill="#00ff88" opacity="0.5"/>
+  <circle cx="180" cy="220" r="2" fill="#88ffcc" opacity="0.6"/>
+  <circle cx="330" cy="240" r="2.5" fill="#00ff88" opacity="0.4"/>
+</svg>

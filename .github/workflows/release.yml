@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci --legacy-peer-deps
+
+      - name: Build Release
+        run: wails build -clean -upx -ldflags "-s -w"
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Rename artifact
+        run: |
+          mv build/bin/cleanforge.exe build/bin/CleanForge-${{ steps.version.outputs.VERSION }}-windows-x64.exe
+
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD --pretty=format:"- %s" >> CHANGELOG.md 2>/dev/null || echo "- Initial release" >> CHANGELOG.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.md
+          files: build/bin/CleanForge-${{ steps.version.outputs.VERSION }}-windows-x64.exe
+          draft: false
+          prerelease: false
+          generate_release_notes: true

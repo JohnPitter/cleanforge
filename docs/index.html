@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  <!-- Primary Meta Tags -->
+  <title>CleanForge - The Ultimate Windows Performance Suite | Free & Open Source</title>
+  <meta name="title" content="CleanForge - The Ultimate Windows Performance Suite | Free & Open Source">
+  <meta name="description" content="CleanForge is a free, open-source Windows optimization tool. Clean junk files, boost gaming FPS, manage startup programs, optimize network, protect privacy, and repair system issues — all in one modern app.">
+  <meta name="keywords" content="Windows optimizer, PC cleaner, gaming optimizer, FPS boost, startup manager, junk cleaner, Windows performance, system cleanup, game boost, privacy tool, bloatware remover, free PC optimizer, open source, Go, Wails, React">
+  <meta name="author" content="JohnPitter">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <link rel="canonical" href="https://johnpitter.github.io/cleanforge/">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://johnpitter.github.io/cleanforge/">
+  <meta property="og:title" content="CleanForge - The Ultimate Windows Performance Suite">
+  <meta property="og:description" content="Free, open-source Windows optimizer. Clean junk, boost gaming FPS, manage startup, optimize network, protect privacy. All in one app.">
+  <meta property="og:image" content="https://johnpitter.github.io/cleanforge/og-image.png">
+  <meta property="og:site_name" content="CleanForge">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://johnpitter.github.io/cleanforge/">
+  <meta name="twitter:title" content="CleanForge - The Ultimate Windows Performance Suite">
+  <meta name="twitter:description" content="Free, open-source Windows optimizer. Clean junk, boost gaming FPS, manage startup, optimize network, protect privacy.">
+  <meta name="twitter:image" content="https://johnpitter.github.io/cleanforge/og-image.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="apple-touch-icon" href="logo.svg">
+
+  <!-- Schema.org Structured Data for AI/Search Engines -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "CleanForge",
+    "alternateName": "CleanForge Performance Suite",
+    "description": "The Ultimate Windows Performance Suite. Free, open-source tool for system cleanup, gaming optimization, startup management, network tuning, privacy protection, and system repair.",
+    "url": "https://johnpitter.github.io/cleanforge/",
+    "downloadUrl": "https://github.com/JohnPitter/cleanforge/releases",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Windows 10, Windows 11",
+    "softwareVersion": "1.0.0",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "JohnPitter",
+      "url": "https://github.com/JohnPitter"
+    },
+    "license": "https://opensource.org/licenses/MIT",
+    "programmingLanguage": ["Go", "TypeScript", "React"],
+    "featureList": [
+      "System junk file cleanup (14 categories)",
+      "Gaming FPS optimization with 6 game profiles",
+      "GPU optimization for NVIDIA, AMD, and Intel",
+      "Mouse and keyboard optimization for gaming",
+      "Startup program manager with impact ratings",
+      "DNS optimizer with preset configurations",
+      "Network latency reduction (Nagle algorithm)",
+      "Privacy protection (12 telemetry tweaks)",
+      "Bloatware removal for Windows apps",
+      "System repair tools (SFC, DISM)",
+      "Memory optimizer with leak detection",
+      "System benchmark and health score",
+      "Interactive CLI mode",
+      "One-click backup and restore"
+    ],
+    "screenshot": "https://johnpitter.github.io/cleanforge/og-image.png",
+    "softwareHelp": "https://github.com/JohnPitter/cleanforge#readme"
+  }
+  </script>
+
+  <!-- FAQ Schema for AI -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is CleanForge?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "CleanForge is a free, open-source Windows performance optimization tool that combines system cleanup, gaming FPS boost, startup management, network optimization, privacy protection, and system repair tools in a single modern application built with Go and React."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is CleanForge free?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, CleanForge is 100% free and open-source under the MIT license. It has no ads, no bloatware, and no telemetry."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does CleanForge boost gaming FPS?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "CleanForge offers 6 game profiles (Competitive FPS, Open World, MOBA, Racing, Casual, Nuclear Mode) that optimize GPU settings, disable pointer acceleration, set raw mouse input, reduce timer resolution to 0.5ms, disable Game DVR/Game Bar, kill bloatware processes, disable core parking, and apply Ultimate Performance power plan."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is CleanForge safe to use?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. CleanForge automatically backs up all system settings before making changes. Every optimization can be restored to its original state with one click. The source code is open for audit on GitHub."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What Windows versions does CleanForge support?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "CleanForge supports Windows 10 and Windows 11 (64-bit). It runs as a native Windows application with no additional runtime dependencies."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --card: #1a1a2e;
+      --border: #2a2a3e;
+      --accent: #00ff88;
+      --accent-dim: #00cc6a;
+      --danger: #ff4444;
+      --warning: #ffaa00;
+      --info: #00aaff;
+      --text: #e0e0e0;
+      --muted: #888899;
+      --purple: #aa44ff;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 100;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 0;
+    }
+
+    .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+
+    .nav-logo img { width: 32px; height: 32px; }
+
+    .nav-logo span {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    .nav-logo span b { color: var(--text); }
+
+    .nav-links { display: flex; gap: 2rem; align-items: center; }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.5rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-dim);
+      box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(0, 255, 136, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-content { position: relative; z-index: 1; max-width: 800px; }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1rem;
+      background: rgba(0, 255, 136, 0.08);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 2rem;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .hero h1 {
+      font-size: 4rem;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.03em;
+    }
+
+    .hero h1 .accent { color: var(--accent); }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+    }
+
+    .hero-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+    .hero-stats {
+      display: flex;
+      gap: 3rem;
+      justify-content: center;
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .hero-stat {
+      text-align: center;
+    }
+
+    .hero-stat .number {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .hero-stat .label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Sections */
+    section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 6rem 2rem;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .section-header h2 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .section-header p {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: all 0.3s;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(0, 255, 136, 0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .feature-card .tag {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.2rem 0.6rem;
+      background: rgba(0, 255, 136, 0.08);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* Profiles Section */
+    .profiles-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    .profile-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .profile-card:hover {
+      border-color: rgba(0, 255, 136, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .profile-card .emoji { font-size: 2.5rem; margin-bottom: 1rem; }
+
+    .profile-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem; }
+
+    .profile-card .games { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.75rem; }
+
+    .profile-card .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      justify-content: center;
+    }
+
+    .profile-card .features span {
+      padding: 0.15rem 0.5rem;
+      background: var(--bg);
+      border-radius: 4px;
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+
+    /* Tech Stack */
+    .tech-grid {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .tech-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 2.5rem;
+      text-align: center;
+      transition: border-color 0.3s;
+    }
+
+    .tech-item:hover { border-color: var(--accent); }
+
+    .tech-item .name { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; }
+
+    .tech-item .role { font-size: 0.7rem; color: var(--muted); }
+
+    /* CTA */
+    .cta {
+      text-align: center;
+      padding: 6rem 2rem;
+      position: relative;
+    }
+
+    .cta::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0, 255, 136, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .cta h2 { font-size: 2.5rem; font-weight: 900; margin-bottom: 1rem; }
+
+    .cta p { color: var(--muted); margin-bottom: 2rem; font-size: 1.05rem; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+    }
+
+    footer p { font-size: 0.8rem; color: var(--muted); }
+
+    footer a { color: var(--accent); text-decoration: none; }
+
+    footer a:hover { text-decoration: underline; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.5rem; }
+      .features-grid, .profiles-grid { grid-template-columns: 1fr; }
+      .hero-stats { flex-direction: column; gap: 1.5rem; }
+      .nav-links { display: none; }
+    }
+
+    @media (max-width: 1024px) {
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .profiles-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav>
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <img src="logo.svg" alt="CleanForge Logo" width="32" height="32">
+        <span>CLEAN<b>FORGE</b></span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#profiles">Game Profiles</a>
+        <a href="#tech">Tech Stack</a>
+        <a href="https://github.com/JohnPitter/cleanforge" class="btn btn-secondary" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/JohnPitter/cleanforge/releases" class="btn btn-primary">Download</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">Open Source &bull; Free Forever &bull; No Ads</div>
+      <h1>
+        Maximum <span class="accent">Performance</span><br>
+        for Your PC
+      </h1>
+      <p>
+        CleanForge is the ultimate Windows optimization suite. Clean junk files,
+        boost gaming FPS, manage startup programs, optimize your network, protect
+        your privacy, and repair system issues — all in one modern, open-source app.
+      </p>
+      <div class="hero-buttons">
+        <a href="https://github.com/JohnPitter/cleanforge/releases" class="btn btn-primary">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+          Download for Windows
+        </a>
+        <a href="https://github.com/JohnPitter/cleanforge" class="btn btn-secondary" target="_blank" rel="noopener">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          View Source
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="number">14</div>
+          <div class="label">Cleanup Categories</div>
+        </div>
+        <div class="hero-stat">
+          <div class="number">6</div>
+          <div class="label">Game Profiles</div>
+        </div>
+        <div class="hero-stat">
+          <div class="number">24+</div>
+          <div class="label">Performance Tweaks</div>
+        </div>
+        <div class="hero-stat">
+          <div class="number">12</div>
+          <div class="label">Privacy Protections</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="section-header">
+      <h2>Everything You Need</h2>
+      <p>One app to rule them all. No more juggling between CCleaner, Razer Cortex, and O&O ShutUp10.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background: rgba(0, 255, 136, 0.1);">&#128465;</div>
+        <h3>System Cleanup</h3>
+        <p>Scan and clean 14 categories of junk files: temp files, browser cache, dev caches (npm, Maven, Gradle, Go), Windows Update leftovers, and more.</p>
+        <span class="tag">Smart Scan with Size Preview</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background: rgba(255, 68, 68, 0.1);">&#127918;</div>
+        <h3>Game Boost</h3>
+        <p>6 game profiles with GPU auto-detection. Optimizes mouse, keyboard, GPU, power plan, timers, and kills bloatware for maximum FPS.</p>
+        <span class="tag">NVIDIA / AMD / Intel</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background: rgba(170, 68, 255, 0.1);">&#128640;</div>
+        <h3>Startup Manager</h3>
+        <p>See which programs slow down your boot with impact ratings. Disable heavy startup apps with one click.</p>
+        <span class="tag">High / Medium / Low Impact</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background: rgba(0, 170, 255, 0.1);">&#127760;</div>
+        <h3>Network Optimizer</h3>
+        <p>Switch DNS to Cloudflare, Google, or Quad9 in one click. Disable Nagle algorithm for lower ping. Flush entire network stack.</p>
+        <span class="tag">Reduce Latency</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background: rgba(0, 255, 136, 0.1);">&#128737;</div>
+        <h3>Privacy Guard</h3>
+        <p>Disable 12 Windows telemetry and tracking features. Block telemetry domains. Remove advertising ID. Stop data collection.</p>
+        <span class="tag">Block Telemetry</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background: rgba(255, 170, 0, 0.1);">&#128295;</div>
+        <h3>System Toolkit</h3>
+        <p>SFC scan, DISM repair, bloatware removal, icon/font cache rebuild, Windows Search reset, and Windows Update repair.</p>
+        <span class="tag">Fix "Bomb" PCs</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game Profiles -->
+  <section id="profiles" style="border-top: 1px solid var(--border);">
+    <div class="section-header">
+      <h2>Game Profiles</h2>
+      <p>Select your game type and CleanForge applies the perfect optimizations automatically.</p>
+    </div>
+    <div class="profiles-grid">
+      <div class="profile-card">
+        <div class="emoji">&#127919;</div>
+        <h3>Competitive FPS</h3>
+        <div class="games">Valorant, CS2, Apex Legends</div>
+        <div class="features">
+          <span>Raw Input</span>
+          <span>No Acceleration</span>
+          <span>GPU Low Latency</span>
+          <span>Timer 0.5ms</span>
+        </div>
+      </div>
+      <div class="profile-card">
+        <div class="emoji">&#127758;</div>
+        <h3>Open World</h3>
+        <div class="games">Cyberpunk, GTA V, Elden Ring</div>
+        <div class="features">
+          <span>No Stutter</span>
+          <span>GPU Max</span>
+          <span>Core Unpark</span>
+          <span>HPET Off</span>
+        </div>
+      </div>
+      <div class="profile-card">
+        <div class="emoji">&#9876;</div>
+        <h3>MOBA / Strategy</h3>
+        <div class="games">LoL, Dota 2, Age of Empires</div>
+        <div class="features">
+          <span>DNS Optimized</span>
+          <span>Nagle Off</span>
+          <span>Fast Keyboard</span>
+        </div>
+      </div>
+      <div class="profile-card">
+        <div class="emoji">&#127950;</div>
+        <h3>Racing / Sim</h3>
+        <div class="games">Forza, F1, iRacing</div>
+        <div class="features">
+          <span>GPU Max</span>
+          <span>Ultimate Power</span>
+          <span>Stable FPS</span>
+        </div>
+      </div>
+      <div class="profile-card">
+        <div class="emoji">&#127918;</div>
+        <h3>Casual</h3>
+        <div class="games">Minecraft, Stardew Valley</div>
+        <div class="features">
+          <span>Light Clean</span>
+          <span>RAM Flush</span>
+          <span>Balanced</span>
+        </div>
+      </div>
+      <div class="profile-card" style="border-color: rgba(255, 68, 68, 0.3); background: rgba(255, 68, 68, 0.03);">
+        <div class="emoji">&#128128;</div>
+        <h3>Nuclear Mode</h3>
+        <div class="games">Maximum Performance</div>
+        <div class="features">
+          <span style="color: var(--danger);">ALL TWEAKS</span>
+          <span style="color: var(--danger);">MAX AGGRESSION</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech Stack -->
+  <section id="tech" style="border-top: 1px solid var(--border);">
+    <div class="section-header">
+      <h2>Built with Modern Tech</h2>
+      <p>Native performance. Modern UI. Single executable.</p>
+    </div>
+    <div class="tech-grid">
+      <div class="tech-item">
+        <div class="name">Go 1.24+</div>
+        <div class="role">Backend</div>
+      </div>
+      <div class="tech-item">
+        <div class="name">React 18</div>
+        <div class="role">Frontend</div>
+      </div>
+      <div class="tech-item">
+        <div class="name">Wails v2</div>
+        <div class="role">Native WebView</div>
+      </div>
+      <div class="tech-item">
+        <div class="name">Tailwind CSS</div>
+        <div class="role">Styling</div>
+      </div>
+      <div class="tech-item">
+        <div class="name">Framer Motion</div>
+        <div class="role">Animations</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta" style="border-top: 1px solid var(--border);">
+    <h2>Ready to Unleash Your PC?</h2>
+    <p>Download CleanForge now. Free forever. Open source. No BS.</p>
+    <div class="hero-buttons">
+      <a href="https://github.com/JohnPitter/cleanforge/releases" class="btn btn-primary">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+        Download for Windows
+      </a>
+      <a href="https://github.com/JohnPitter/cleanforge" class="btn btn-secondary" target="_blank" rel="noopener">
+        View on GitHub
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>
+      CleanForge &copy; 2026 <a href="https://github.com/JohnPitter">JohnPitter</a>.
+      Open source under <a href="https://opensource.org/licenses/MIT">MIT License</a>.
+    </p>
+  </footer>
+</body>
+</html>
