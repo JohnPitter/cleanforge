@@ -223,35 +223,96 @@ func GetGPUInfo() (name string, driver string) {
 	return name, driver
 }
 
+// detectRAMManufacturer infers the manufacturer from the part number prefix
+// when WMI returns "Unknown" or empty.
+func detectRAMManufacturer(partNumber, wmiManufacturer string) string {
+	mfr := strings.TrimSpace(wmiManufacturer)
+	if mfr != "" && !strings.EqualFold(mfr, "unknown") {
+		return mfr
+	}
+
+	pn := strings.ToUpper(strings.TrimSpace(partNumber))
+	if pn == "" {
+		return mfr
+	}
+
+	// Map part-number prefixes to manufacturers
+	prefixes := []struct {
+		prefix string
+		name   string
+	}{
+		{"CMW", "Corsair"},
+		{"CMK", "Corsair"},
+		{"CMR", "Corsair"},
+		{"CML", "Corsair"},
+		{"CMH", "Corsair"},
+		{"CMT", "Corsair"},
+		{"CM", "Corsair"},
+		{"KVR", "Kingston"},
+		{"KHX", "Kingston"},
+		{"FURY", "Kingston"},
+		{"HX", "Kingston"},
+		{"F5-", "G.Skill"},
+		{"F4-", "G.Skill"},
+		{"F3-", "G.Skill"},
+		{"BL", "Crucial"},
+		{"CT", "Crucial"},
+		{"BLS", "Crucial"},
+		{"HMA", "SK Hynix"},
+		{"HMT", "SK Hynix"},
+		{"HMCG", "SK Hynix"},
+		{"HMAA", "SK Hynix"},
+		{"M378", "Samsung"},
+		{"M471", "Samsung"},
+		{"M393", "Samsung"},
+		{"M3", "Samsung"},
+		{"PVS", "Patriot"},
+		{"PV", "Patriot"},
+		{"AD", "ADATA"},
+		{"AX", "ADATA"},
+		{"TF", "Team Group"},
+		{"TD", "Team Group"},
+		{"TLZGD", "Team Group"},
+	}
+
+	for _, p := range prefixes {
+		if strings.HasPrefix(pn, p.prefix) {
+			return p.name
+		}
+	}
+
+	return mfr
+}
+
 // GetRAMModules queries individual RAM sticks via WMI.
 func GetRAMModules() []RAMModule {
 	if runtime.GOOS != "windows" {
 		return nil
 	}
 
-	out, err := cmd.Hidden("wmic", "memorychip", "get", "Manufacturer,Capacity,Speed,PartNumber,DeviceLocator,FormFactor", "/format:csv").Output()
+	out, err := cmd.Hidden("wmic", "memorychip", "get", "Manufacturer,Capacity,Speed,PartNumber,DeviceLocator,FormFactor,BankLabel", "/format:csv").Output()
 	if err != nil {
 		return nil
 	}
 
 	var modules []RAMModule
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	for _, line := range lines {
+	for idx, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "Node") {
 			continue
 		}
-		// CSV: Node,Capacity,DeviceLocator,FormFactor,Manufacturer,PartNumber,Speed
+		// CSV: Node,BankLabel,Capacity,DeviceLocator,FormFactor,Manufacturer,PartNumber,Speed
 		parts := strings.Split(line, ",")
-		if len(parts) < 7 {
+		if len(parts) < 8 {
 			continue
 		}
 		var capacity uint64
-		fmt.Sscan(strings.TrimSpace(parts[1]), &capacity)
+		fmt.Sscan(strings.TrimSpace(parts[2]), &capacity)
 		var speed uint32
-		fmt.Sscan(strings.TrimSpace(parts[6]), &speed)
+		fmt.Sscan(strings.TrimSpace(parts[7]), &speed)
 		var formFactorNum int
-		fmt.Sscan(strings.TrimSpace(parts[3]), &formFactorNum)
+		fmt.Sscan(strings.TrimSpace(parts[4]), &formFactorNum)
 
 		ff := "Unknown"
 		switch formFactorNum {
@@ -261,24 +322,87 @@ func GetRAMModules() []RAMModule {
 			ff = "SO-DIMM"
 		}
 
+		partNumber := strings.TrimSpace(parts[6])
+		manufacturer := detectRAMManufacturer(partNumber, parts[5])
+
+		// Build slot label: prefer BankLabel/DeviceLocator, fall back to index
+		slot := strings.TrimSpace(parts[1])
+		devLocator := strings.TrimSpace(parts[3])
+		if devLocator != "" && devLocator != slot {
+			slot = devLocator
+		}
+		if slot == "" {
+			slot = fmt.Sprintf("Slot %d", idx)
+		}
+
 		modules = append(modules, RAMModule{
-			Manufacturer: strings.TrimSpace(parts[4]),
+			Manufacturer: manufacturer,
 			Capacity:     capacity,
 			Speed:        speed,
-			PartNumber:   strings.TrimSpace(parts[5]),
-			Slot:         strings.TrimSpace(parts[2]),
+			PartNumber:   partNumber,
+			Slot:         slot,
 			FormFactor:   ff,
 		})
 	}
 	return modules
 }
 
-// GetGPUDetails queries all GPU adapters with VRAM info via WMI.
+// GetGPUDetails queries all GPU adapters with VRAM info.
+// Uses PowerShell to read qwMemorySize which supports >4 GB (AdapterRAM is 32-bit and overflows).
 func GetGPUDetails() []GPUDetail {
 	if runtime.GOOS != "windows" {
 		return nil
 	}
 
+	// PowerShell query returns correct 64-bit VRAM via registry qwMemorySize
+	psScript := `Get-CimInstance Win32_VideoController | ForEach-Object {
+		$vram = 0
+		$regPath = "HKLM:\SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+		$subkeys = Get-ChildItem $regPath -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '\\\d{4}$' }
+		foreach ($sk in $subkeys) {
+			$desc = (Get-ItemProperty $sk.PSPath -ErrorAction SilentlyContinue).'DriverDesc'
+			if ($desc -eq $_.Name) {
+				$qw = (Get-ItemProperty $sk.PSPath -ErrorAction SilentlyContinue).'HardwareInformation.qwMemorySize'
+				if ($qw) { $vram = $qw; break }
+			}
+		}
+		if ($vram -eq 0) { $vram = $_.AdapterRAM }
+		"$($_.Name)|$($_.DriverVersion)|$vram"
+	}`
+
+	out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psScript).Output()
+	if err != nil {
+		return getGPUDetailsFallback()
+	}
+
+	var gpus []GPUDetail
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "|")
+		if len(parts) < 3 {
+			continue
+		}
+		var vram uint64
+		fmt.Sscan(strings.TrimSpace(parts[2]), &vram)
+
+		gpus = append(gpus, GPUDetail{
+			Name:   strings.TrimSpace(parts[0]),
+			Driver: strings.TrimSpace(parts[1]),
+			VRAM:   vram,
+		})
+	}
+	if len(gpus) > 0 {
+		return gpus
+	}
+	return getGPUDetailsFallback()
+}
+
+// getGPUDetailsFallback uses wmic (AdapterRAM is 32-bit, caps at ~4 GB).
+func getGPUDetailsFallback() []GPUDetail {
 	out, err := cmd.Hidden("wmic", "path", "win32_VideoController", "get", "Name,DriverVersion,AdapterRAM", "/format:csv").Output()
 	if err != nil {
 		return nil
