@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Loader2,
   Activity,
-  Shield,
 } from "lucide-react";
 
 interface NetworkStatus {
@@ -36,7 +35,6 @@ const dnsPresets: DNSPreset[] = [
 
 export default function Network() {
   const [status, setStatus] = useState<NetworkStatus | null>(null);
-  const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
   const [flushing, setFlushing] = useState(false);
   const [flushResult, setFlushResult] = useState<string | null>(null);
@@ -48,13 +46,11 @@ export default function Network() {
   }, []);
 
   async function loadStatus() {
-    setLoading(true);
     try {
       // @ts-ignore
       const data = await window.go.main.App.GetNetworkStatus();
       setStatus(data);
     } catch {}
-    setLoading(false);
   }
 
   async function setDNS(preset: DNSPreset) {
@@ -159,25 +155,41 @@ export default function Network() {
           <Globe className="w-4 h-4" /> DNS Presets
         </h3>
         <div className="grid grid-cols-2 gap-3">
-          {dnsPresets.map((preset) => (
-            <motion.button
-              key={preset.id}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              onClick={() => setDNS(preset)}
-              disabled={applying !== null}
-              className="text-left p-4 bg-forge-card border border-forge-border rounded-xl hover:border-forge-accent/30 transition-all disabled:opacity-50"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-bold text-forge-text">{preset.name}</span>
-                {applying === preset.id && <Loader2 className="w-3 h-3 animate-spin text-forge-accent" />}
-              </div>
-              <p className="text-xs text-forge-muted mb-2">{preset.description}</p>
-              <p className="text-[10px] font-mono text-forge-muted">
-                {preset.primary} | {preset.secondary}
-              </p>
-            </motion.button>
-          ))}
+          {dnsPresets.map((preset) => {
+            const isActive = status?.currentDns
+              ? status.currentDns.includes(preset.primary)
+              : false;
+            return (
+              <motion.button
+                key={preset.id}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => setDNS(preset)}
+                disabled={applying !== null}
+                className={`text-left p-4 bg-forge-card border rounded-xl transition-all disabled:opacity-50 ${
+                  isActive
+                    ? "border-forge-accent shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                    : "border-forge-border hover:border-forge-accent/30"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-forge-text">{preset.name}</span>
+                    {isActive && (
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-forge-accent/15 text-forge-accent rounded-full">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Active
+                      </span>
+                    )}
+                  </div>
+                  {applying === preset.id && <Loader2 className="w-3 h-3 animate-spin text-forge-accent" />}
+                </div>
+                <p className="text-xs text-forge-muted mb-2">{preset.description}</p>
+                <p className="text-[10px] font-mono text-forge-muted">
+                  {preset.primary} | {preset.secondary}
+                </p>
+              </motion.button>
+            );
+          })}
         </div>
         <button
           onClick={resetDNS}

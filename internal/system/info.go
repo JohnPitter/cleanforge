@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"cleanforge/internal/cmd"
@@ -12,6 +13,72 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/shirou/gopsutil/v4/mem"
 )
+
+// staticCache holds hardware info that never changes during a session.
+var (
+	staticOnce  sync.Once
+	staticCache *staticInfo
+)
+
+type staticInfo struct {
+	OS         string
+	Hostname   string
+	Platform   string
+	CPUModel   string
+	CPUCores   int
+	CPUThreads int
+	RAMTotal   uint64
+	RAMModules []RAMModule
+	GPUName    string
+	GPUDriver  string
+	GPUs       []GPUDetail
+	PhysDisks  []PhysDisk
+}
+
+// loadStaticInfo collects hardware details that don't change at runtime.
+// Called once and cached via sync.Once.
+func loadStaticInfo() *staticInfo {
+	staticOnce.Do(func() {
+		s := &staticInfo{}
+
+		// OS info
+		s.OS = runtime.GOOS
+		hostInfo, err := host.Info()
+		if err == nil {
+			s.Hostname = hostInfo.Hostname
+			s.Platform = hostInfo.Platform + " " + hostInfo.PlatformVersion
+		}
+
+		// CPU info
+		cpuInfos, err := cpu.Info()
+		if err == nil && len(cpuInfos) > 0 {
+			s.CPUModel = cpuInfos[0].ModelName
+		}
+		physicalCores, err := cpu.Counts(false)
+		if err == nil {
+			s.CPUCores = physicalCores
+		}
+		logicalCores, err := cpu.Counts(true)
+		if err == nil {
+			s.CPUThreads = logicalCores
+		}
+
+		// RAM total
+		ramInfo, _ := mem.VirtualMemory()
+		if ramInfo != nil {
+			s.RAMTotal = ramInfo.Total
+		}
+
+		// Hardware details (WMI / PowerShell — slow, only once)
+		s.RAMModules = GetRAMModules()
+		s.GPUName, s.GPUDriver = GetGPUInfo()
+		s.GPUs = GetGPUDetails()
+		s.PhysDisks = GetPhysicalDisks()
+
+		staticCache = s
+	})
+	return staticCache
+}
 
 // SystemInfo holds comprehensive system information for the Dashboard.
 type SystemInfo struct {
@@ -71,68 +138,49 @@ type DiskInfo struct {
 }
 
 // GetSystemInfo gathers all system information including CPU, RAM, GPU, disks, and uptime.
+// Static hardware data (CPU model, RAM modules, GPU, physical disks) is cached after the first call.
+// Only dynamic metrics (CPU/RAM usage, disk usage, uptime, health) are refreshed each call.
 func GetSystemInfo() (*SystemInfo, error) {
-	info := &SystemInfo{}
+	s := loadStaticInfo()
 
-	// OS info
-	info.OS = runtime.GOOS
-	hostInfo, err := host.Info()
-	if err == nil {
-		info.Hostname = hostInfo.Hostname
-		info.Platform = hostInfo.Platform + " " + hostInfo.PlatformVersion
+	info := &SystemInfo{
+		// Cached static data
+		OS:         s.OS,
+		Hostname:   s.Hostname,
+		Platform:   s.Platform,
+		CPUModel:   s.CPUModel,
+		CPUCores:   s.CPUCores,
+		CPUThreads: s.CPUThreads,
+		RAMTotal:   s.RAMTotal,
+		RAMModules: s.RAMModules,
+		GPUName:    s.GPUName,
+		GPUDriver:  s.GPUDriver,
+		GPUs:       s.GPUs,
+		PhysDisks:  s.PhysDisks,
 	}
 
-	// CPU info
-	cpuInfos, err := cpu.Info()
-	if err == nil && len(cpuInfos) > 0 {
-		info.CPUModel = cpuInfos[0].ModelName
-	}
-
-	physicalCores, err := cpu.Counts(false)
-	if err == nil {
-		info.CPUCores = physicalCores
-	}
-
-	logicalCores, err := cpu.Counts(true)
-	if err == nil {
-		info.CPUThreads = logicalCores
-	}
-
-	// CPU usage (sampled over 1 second)
+	// Dynamic data — refreshed every call
 	cpuUsage, err := GetCPUUsage()
 	if err == nil {
 		info.CPUUsage = cpuUsage
 	}
 
-	// RAM info
 	ramInfo, err := GetRAMUsage()
 	if err == nil {
-		info.RAMTotal = ramInfo.Total
 		info.RAMUsed = ramInfo.Used
 		info.RAMUsage = ramInfo.UsedPercent
 	}
 
-	// RAM modules
-	info.RAMModules = GetRAMModules()
-
-	// GPU info
-	info.GPUName, info.GPUDriver = GetGPUInfo()
-	info.GPUs = GetGPUDetails()
-
-	// Disk info
 	disks, err := GetDiskUsage()
 	if err == nil {
 		info.Disks = disks
 	}
-	info.PhysDisks = GetPhysicalDisks()
 
-	// Uptime
 	uptimeSecs, err := host.Uptime()
 	if err == nil {
 		info.Uptime = formatUptime(uptimeSecs)
 	}
 
-	// Health score
 	info.HealthScore = CalculateHealthScore(info)
 
 	return info, nil
