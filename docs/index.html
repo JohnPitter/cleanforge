@@ -188,7 +188,7 @@
       --duration-slow: 800ms;
 
       --max-width: 1200px;
-      --section-padding: clamp(4rem, 3rem + 5vw, 8rem);
+      --section-padding: clamp(3rem, 2rem + 3vw, 5rem);
     }
 
     /* === BASE === */
@@ -1310,7 +1310,7 @@
             revealObserver.unobserve(entry.target);
           }
         });
-      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+      }, { threshold: 0.05, rootMargin: '0px 0px 100px 0px' });
 
       document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
