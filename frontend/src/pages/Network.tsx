@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Loader2,
   Activity,
+  AlertCircle,
 } from "lucide-react";
 
 interface NetworkStatus {
@@ -50,10 +51,27 @@ export default function Network() {
   const [flushResult, setFlushResult] = useState<string | null>(null);
   const [pingResult, setPingResult] = useState<number | null>(null);
   const [pinging, setPinging] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     loadStatus();
   }, []);
+
+  // Auto-dismiss messages after 5s
+  useEffect(() => {
+    if (errorMsg) {
+      const t = setTimeout(() => setErrorMsg(null), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [errorMsg]);
+
+  useEffect(() => {
+    if (successMsg) {
+      const t = setTimeout(() => setSuccessMsg(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [successMsg]);
 
   async function loadStatus() {
     try {
@@ -68,28 +86,56 @@ export default function Network() {
 
   async function setDNS(preset: DNSPreset) {
     setApplying(preset.id);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    // Safety timeout: if backend hangs >15s, clear spinner and show error
+    const timeout = setTimeout(() => {
+      setApplying(null);
+      setErrorMsg("DNS change timed out. Try running as Administrator.");
+    }, 15000);
+
     try {
       // @ts-ignore
       await window.go.main.App.SetDNS(preset);
+      clearTimeout(timeout);
+      setSuccessMsg(`${preset.name} DNS applied successfully!`);
       await loadStatus();
-    } catch (e) {
-      console.error("DNS change failed:", e);
+    } catch (e: any) {
+      clearTimeout(timeout);
+      const msg = e?.message || String(e) || "Unknown error";
+      setErrorMsg(`Failed to apply ${preset.name}: ${msg}`);
     }
     setApplying(null);
   }
 
   async function resetDNS() {
     setApplying("reset");
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const timeout = setTimeout(() => {
+      setApplying(null);
+      setErrorMsg("DNS reset timed out. Try running as Administrator.");
+    }, 15000);
+
     try {
       // @ts-ignore
       await window.go.main.App.ResetDNS();
+      clearTimeout(timeout);
+      setSuccessMsg("DNS reset to DHCP (Automatic)");
       await loadStatus();
-    } catch {}
+    } catch (e: any) {
+      clearTimeout(timeout);
+      const msg = e?.message || String(e) || "Unknown error";
+      setErrorMsg(`Failed to reset DNS: ${msg}`);
+    }
     setApplying(null);
   }
 
   async function toggleNagle() {
     setApplying("nagle");
+    setErrorMsg(null);
     try {
       if (status?.nagleDisabled) {
         // @ts-ignore
@@ -99,18 +145,25 @@ export default function Network() {
         await window.go.main.App.DisableNagle();
       }
       await loadStatus();
-    } catch {}
+    } catch (e: any) {
+      const msg = e?.message || String(e) || "Unknown error";
+      setErrorMsg(`Nagle toggle failed: ${msg}`);
+    }
     setApplying(null);
   }
 
   async function flushNetwork() {
     setFlushing(true);
     setFlushResult(null);
+    setErrorMsg(null);
     try {
       // @ts-ignore
       const result = await window.go.main.App.FlushNetwork();
       setFlushResult(result);
-    } catch {}
+    } catch (e: any) {
+      const msg = e?.message || String(e) || "Unknown error";
+      setErrorMsg(`Network flush failed: ${msg}`);
+    }
     setFlushing(false);
   }
 
@@ -280,6 +333,30 @@ export default function Network() {
           )}
         </motion.button>
       </div>
+
+      {/* Success Message */}
+      {successMsg && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-forge-accent/10 border border-forge-accent/30 rounded-lg p-3 flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4 text-forge-accent shrink-0" />
+          <p className="text-xs text-forge-accent">{successMsg}</p>
+        </motion.div>
+      )}
+
+      {/* Error Message */}
+      {errorMsg && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-forge-danger/10 border border-forge-danger/30 rounded-lg p-3 flex items-center gap-2"
+        >
+          <AlertCircle className="w-4 h-4 text-forge-danger shrink-0" />
+          <p className="text-xs text-forge-danger">{errorMsg}</p>
+        </motion.div>
+      )}
 
       {flushResult && (
         <motion.div

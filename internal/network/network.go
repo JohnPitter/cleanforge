@@ -1,16 +1,40 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"cleanforge/internal/cmd"
 	"golang.org/x/sys/windows/registry"
 )
+
+// Adapter cache — set by GetNetworkStatus(), reused by SetDNS()/ResetDNS()
+// to avoid redundant slow PowerShell calls.
+var (
+	cachedAdapter   string
+	cachedAdapterMu sync.RWMutex
+)
+
+// cmdTimeout is the default timeout for PowerShell/netsh commands.
+const cmdTimeout = 10 * time.Second
+
+func getCachedAdapter() string {
+	cachedAdapterMu.RLock()
+	defer cachedAdapterMu.RUnlock()
+	return cachedAdapter
+}
+
+func setCachedAdapter(name string) {
+	cachedAdapterMu.Lock()
+	defer cachedAdapterMu.Unlock()
+	cachedAdapter = name
+}
 
 // DNSPreset represents a DNS configuration preset.
 type DNSPreset struct {
@@ -75,8 +99,12 @@ func GetDNSPresets() []DNSPreset {
 // GetNetworkStatus retrieves the current network configuration for the active adapter.
 // Uses PowerShell as primary method (locale-independent), with netsh as fallback.
 // Never returns an error — always returns at least partial status so the UI can render.
+// Caches the adapter name for use by SetDNS/ResetDNS to avoid redundant slow calls.
 func GetNetworkStatus() (*NetworkStatus, error) {
 	status := &NetworkStatus{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel()
 
 	// Primary: Single PowerShell call to get ALL network info (locale-independent)
 	psCmd := `$cfg = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null } | Select-Object -First 1
@@ -84,7 +112,7 @@ if ($cfg) {
     $dns = (Get-DnsClientServerAddress -InterfaceIndex $cfg.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue).ServerAddresses -join ', '
     "$($cfg.InterfaceAlias)|$($cfg.IPv4Address.IPAddress)|$($cfg.IPv4DefaultGateway.NextHop)|$dns"
 }`
-	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psCmd).Output(); err == nil {
+	if out, err := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).Output(); err == nil {
 		result := strings.TrimSpace(string(out))
 		if result != "" {
 			parts := strings.SplitN(result, "|", 4)
@@ -112,7 +140,9 @@ if ($cfg) {
 
 	// Fallback 2: netsh parsing with multi-locale support if still missing data
 	if status.Adapter != "" && (status.IPAddress == "" || status.CurrentDNS == "") {
-		if out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config", "name="+status.Adapter).CombinedOutput(); err == nil {
+		ctx2, cancel2 := context.WithTimeout(context.Background(), cmdTimeout)
+		defer cancel2()
+		if out, err := cmd.HiddenContext(ctx2, "netsh", "interface", "ip", "show", "config", "name="+status.Adapter).CombinedOutput(); err == nil {
 			lines := strings.Split(string(out), "\n")
 			for _, line := range lines {
 				line = strings.TrimSpace(line)
@@ -145,15 +175,22 @@ if ($cfg) {
 		}
 	}
 
-	// Fallback 3: If we still don't have DNS, check via netsh dns show config
+	// Fallback 3: If we still don't have DNS, check via PowerShell directly
 	if status.CurrentDNS == "" && status.Adapter != "" {
+		ctx3, cancel3 := context.WithTimeout(context.Background(), cmdTimeout)
+		defer cancel3()
 		psDNS := fmt.Sprintf(`(Get-DnsClientServerAddress -InterfaceAlias '%s' -AddressFamily IPv4 -ErrorAction SilentlyContinue).ServerAddresses -join ', '`, status.Adapter)
-		if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psDNS).Output(); err == nil {
+		if out, err := cmd.HiddenContext(ctx3, "powershell", "-NoProfile", "-Command", psDNS).Output(); err == nil {
 			dns := strings.TrimSpace(string(out))
 			if dns != "" {
 				status.CurrentDNS = dns
 			}
 		}
+	}
+
+	// Cache the adapter name for SetDNS/ResetDNS to reuse
+	if status.Adapter != "" {
+		setCachedAdapter(status.Adapter)
 	}
 
 	// Check Nagle status
@@ -162,41 +199,95 @@ if ($cfg) {
 	return status, nil
 }
 
-// SetDNS applies the given DNS preset to the active network adapter.
-func SetDNS(preset DNSPreset) error {
+// getAdapter returns the cached adapter name or fetches it fresh.
+// Uses the cache from GetNetworkStatus() to avoid slow PowerShell re-calls.
+func getAdapter() (string, error) {
+	// Try cache first (set by GetNetworkStatus)
+	if cached := getCachedAdapter(); cached != "" {
+		return cached, nil
+	}
+	// Fall back to fresh detection
 	adapter, err := GetActiveAdapter()
 	if err != nil {
-		return fmt.Errorf("failed to get active adapter: %w", err)
+		return "", err
 	}
+	setCachedAdapter(adapter)
+	return adapter, nil
+}
+
+// SetDNS applies the given DNS preset to the active network adapter.
+// Uses PowerShell Set-DnsClientServerAddress (locale-independent, no admin needed).
+// Falls back to netsh if PowerShell fails.
+func SetDNS(preset DNSPreset) error {
+	adapter, err := getAdapter()
+	if err != nil {
+		return fmt.Errorf("no active network adapter found: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel()
+
+	// Primary: PowerShell Set-DnsClientServerAddress (locale-independent, works without admin)
+	psCmd := fmt.Sprintf(
+		`Set-DnsClientServerAddress -InterfaceAlias '%s' -ServerAddresses ('%s','%s')`,
+		adapter, preset.Primary, preset.Secondary,
+	)
+	out, err := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).CombinedOutput()
+	if err == nil {
+		return nil
+	}
+
+	// Fallback: netsh (may need admin on some Windows configs)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel2()
 
 	// Set primary DNS
-	out, err := cmd.Hidden("netsh", "interface", "ip", "set", "dns",
-		fmt.Sprintf("name=%s", adapter), "static", preset.Primary).CombinedOutput()
+	out, err = cmd.HiddenContext(ctx2, "netsh", "interface", "ip", "set", "dns",
+		fmt.Sprintf(`name="%s"`, adapter), "static", preset.Primary).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to set primary DNS: %s - %w", string(out), err)
+		return fmt.Errorf("failed to set DNS: %s - %w", strings.TrimSpace(string(out)), err)
 	}
 
+	ctx3, cancel3 := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel3()
+
 	// Set secondary DNS
-	out, err = cmd.Hidden("netsh", "interface", "ip", "add", "dns",
-		fmt.Sprintf("name=%s", adapter), preset.Secondary, "index=2").CombinedOutput()
+	out, err = cmd.HiddenContext(ctx3, "netsh", "interface", "ip", "add", "dns",
+		fmt.Sprintf(`name="%s"`, adapter), preset.Secondary, "index=2").CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to set secondary DNS: %s - %w", string(out), err)
+		return fmt.Errorf("failed to set secondary DNS: %s - %w", strings.TrimSpace(string(out)), err)
 	}
 
 	return nil
 }
 
 // ResetDNS resets the DNS configuration to DHCP (automatic) for the active adapter.
+// Uses PowerShell Set-DnsClientServerAddress -ResetServerAddresses (locale-independent).
+// Falls back to netsh if PowerShell fails.
 func ResetDNS() error {
-	adapter, err := GetActiveAdapter()
+	adapter, err := getAdapter()
 	if err != nil {
-		return fmt.Errorf("failed to get active adapter: %w", err)
+		return fmt.Errorf("no active network adapter found: %w", err)
 	}
 
-	out, err := cmd.Hidden("netsh", "interface", "ip", "set", "dns",
-		fmt.Sprintf("name=%s", adapter), "dhcp").CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel()
+
+	// Primary: PowerShell (locale-independent, works without admin)
+	psCmd := fmt.Sprintf(`Set-DnsClientServerAddress -InterfaceAlias '%s' -ResetServerAddresses`, adapter)
+	out, err := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).CombinedOutput()
+	if err == nil {
+		return nil
+	}
+
+	// Fallback: netsh
+	ctx2, cancel2 := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel2()
+
+	out, err = cmd.HiddenContext(ctx2, "netsh", "interface", "ip", "set", "dns",
+		fmt.Sprintf(`name="%s"`, adapter), "dhcp").CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to reset DNS to DHCP: %s - %w", string(out), err)
+		return fmt.Errorf("failed to reset DNS to DHCP: %s - %w", strings.TrimSpace(string(out)), err)
 	}
 
 	return nil
@@ -313,9 +404,12 @@ func FlushNetwork() (string, error) {
 // GetActiveAdapter finds the currently active network adapter name.
 // Uses PowerShell as primary method (locale-independent), with netsh as fallback.
 func GetActiveAdapter() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
+	defer cancel()
+
 	// Primary: PowerShell (works on any Windows locale)
 	psCmd := `(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null } | Select-Object -First 1).InterfaceAlias`
-	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psCmd).Output(); err == nil {
+	if out, err := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).Output(); err == nil {
 		adapter := strings.TrimSpace(string(out))
 		if adapter != "" {
 			return adapter, nil
