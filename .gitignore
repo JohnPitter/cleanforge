@@ -1,3 +1,13 @@
 build/bin
 node_modules
 frontend/dist
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.env
+.vscode/
+.idea/
+*.log

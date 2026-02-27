@@ -2,31 +2,48 @@ package main
 
 import (
 	"embed"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app structure
+	// Check for CLI mode
+	for _, arg := range os.Args[1:] {
+		if arg == "--cli" || arg == "-c" {
+			runCLI()
+			return
+		}
+	}
+
 	app := NewApp()
 
-	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "cleanforge",
-		Width:  1024,
-		Height: 768,
+		Title:            "CleanForge",
+		Width:            1200,
+		Height:           800,
+		MinWidth:         900,
+		MinHeight:        600,
+		DisableResize:    false,
+		Frameless:        true,
+		BackgroundColour: &options.RGBA{R: 10, G: 10, B: 15, A: 255},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
+		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
+		},
+		Windows: &windows.Options{
+			WebviewIsTransparent: false,
+			WindowIsTranslucent:  false,
+			Theme:                windows.Dark,
 		},
 	})
 

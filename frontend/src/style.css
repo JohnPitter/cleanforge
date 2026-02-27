@@ -1,26 +1,72 @@
-html {
-    background-color: rgba(27, 38, 54, 1);
-    text-align: center;
-    color: white;
+@import "tailwindcss";
+
+@theme {
+  --color-forge-bg: #0a0a0f;
+  --color-forge-surface: #12121a;
+  --color-forge-card: #1a1a2e;
+  --color-forge-border: #2a2a3e;
+  --color-forge-accent: #00ff88;
+  --color-forge-accent-dim: #00cc6a;
+  --color-forge-danger: #ff4444;
+  --color-forge-warning: #ffaa00;
+  --color-forge-info: #00aaff;
+  --color-forge-text: #e0e0e0;
+  --color-forge-muted: #888899;
+  --color-forge-purple: #aa44ff;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-    margin: 0;
-    color: white;
-    font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-    "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif;
+  background-color: var(--color-forge-bg);
+  color: var(--color-forge-text);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  user-select: none;
 }
 
-@font-face {
-    font-family: "Nunito";
-    font-style: normal;
-    font-weight: 400;
-    src: local(""),
-    url("assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
+::-webkit-scrollbar {
+  width: 6px;
 }
 
-#app {
-    height: 100vh;
-    text-align: center;
+::-webkit-scrollbar-track {
+  background: var(--color-forge-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-forge-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-forge-accent-dim);
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px var(--color-forge-accent), 0 0 10px rgba(0, 255, 136, 0.3); }
+  50% { box-shadow: 0 0 10px var(--color-forge-accent), 0 0 20px rgba(0, 255, 136, 0.5); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.9); opacity: 1; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+@keyframes slide-in {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.glow-effect {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.glass {
+  background: rgba(26, 26, 46, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(42, 42, 62, 0.5);
 }

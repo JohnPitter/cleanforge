@@ -1,28 +1,38 @@
-import {useState} from 'react';
-import logo from './assets/images/logo-universal.png';
-import './App.css';
-import {Greet} from "../wailsjs/go/main/App";
+import { Routes, Route } from "react-router-dom";
+import Sidebar from "./components/Sidebar";
+import Dashboard from "./pages/Dashboard";
+import Cleaner from "./pages/Cleaner";
+import GameBoost from "./pages/GameBoost";
+import Startup from "./pages/Startup";
+import Network from "./pages/Network";
+import Toolkit from "./pages/Toolkit";
+import Privacy from "./pages/Privacy";
+import Settings from "./pages/Settings";
 
 function App() {
-    const [resultText, setResultText] = useState("Please enter your name below 👇");
-    const [name, setName] = useState('');
-    const updateName = (e: any) => setName(e.target.value);
-    const updateResultText = (result: string) => setResultText(result);
-
-    function greet() {
-        Greet(name).then(updateResultText);
-    }
-
-    return (
-        <div id="App">
-            <img src={logo} id="logo" alt="logo"/>
-            <div id="result" className="result">{resultText}</div>
-            <div id="input" className="input-box">
-                <input id="name" className="input" onChange={updateName} autoComplete="off" name="input" type="text"/>
-                <button className="btn" onClick={greet}>Greet</button>
-            </div>
+  return (
+    <div className="flex h-screen bg-forge-bg overflow-hidden">
+      <Sidebar />
+      <main className="flex-1 overflow-hidden">
+        <div
+          className="h-8 w-full bg-forge-surface border-b border-forge-border"
+          style={{ WebkitAppRegion: "drag" } as any}
+        />
+        <div className="h-[calc(100vh-2rem)]">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/cleaner" element={<Cleaner />} />
+            <Route path="/gameboost" element={<GameBoost />} />
+            <Route path="/startup" element={<Startup />} />
+            <Route path="/network" element={<Network />} />
+            <Route path="/toolkit" element={<Toolkit />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
         </div>
-    )
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
