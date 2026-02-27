@@ -217,7 +217,7 @@ func getAdapter() (string, error) {
 
 // SetDNS applies the given DNS preset to the active network adapter.
 // Uses PowerShell Set-DnsClientServerAddress (locale-independent, no admin needed).
-// Falls back to netsh if PowerShell fails.
+// Falls back to netsh via cmd /C (to avoid Go arg escaping issues with adapter names containing spaces).
 func SetDNS(preset DNSPreset) error {
 	adapter, err := getAdapter()
 	if err != nil {
@@ -229,21 +229,22 @@ func SetDNS(preset DNSPreset) error {
 
 	// Primary: PowerShell Set-DnsClientServerAddress (locale-independent, works without admin)
 	psCmd := fmt.Sprintf(
-		`Set-DnsClientServerAddress -InterfaceAlias '%s' -ServerAddresses ('%s','%s')`,
+		`Set-DnsClientServerAddress -InterfaceAlias '%s' -ServerAddresses @('%s','%s')`,
 		adapter, preset.Primary, preset.Secondary,
 	)
-	out, err := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).CombinedOutput()
-	if err == nil {
+	if out, psErr := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).CombinedOutput(); psErr == nil {
 		return nil
+	} else {
+		_ = out // PowerShell failed, try netsh fallback
 	}
 
-	// Fallback: netsh (may need admin on some Windows configs)
+	// Fallback: netsh via cmd /C to avoid Go's arg escaping mangling the adapter name
 	ctx2, cancel2 := context.WithTimeout(context.Background(), cmdTimeout)
 	defer cancel2()
 
 	// Set primary DNS
-	out, err = cmd.HiddenContext(ctx2, "netsh", "interface", "ip", "set", "dns",
-		fmt.Sprintf(`name="%s"`, adapter), "static", preset.Primary).CombinedOutput()
+	netshCmd1 := fmt.Sprintf(`netsh interface ip set dns name="%s" static %s`, adapter, preset.Primary)
+	out, err := cmd.HiddenContext(ctx2, "cmd", "/C", netshCmd1).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to set DNS: %s - %w", strings.TrimSpace(string(out)), err)
 	}
@@ -252,8 +253,8 @@ func SetDNS(preset DNSPreset) error {
 	defer cancel3()
 
 	// Set secondary DNS
-	out, err = cmd.HiddenContext(ctx3, "netsh", "interface", "ip", "add", "dns",
-		fmt.Sprintf(`name="%s"`, adapter), preset.Secondary, "index=2").CombinedOutput()
+	netshCmd2 := fmt.Sprintf(`netsh interface ip add dns name="%s" %s index=2`, adapter, preset.Secondary)
+	out, err = cmd.HiddenContext(ctx3, "cmd", "/C", netshCmd2).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to set secondary DNS: %s - %w", strings.TrimSpace(string(out)), err)
 	}
@@ -263,7 +264,7 @@ func SetDNS(preset DNSPreset) error {
 
 // ResetDNS resets the DNS configuration to DHCP (automatic) for the active adapter.
 // Uses PowerShell Set-DnsClientServerAddress -ResetServerAddresses (locale-independent).
-// Falls back to netsh if PowerShell fails.
+// Falls back to netsh via cmd /C (to avoid Go arg escaping issues with adapter names containing spaces).
 func ResetDNS() error {
 	adapter, err := getAdapter()
 	if err != nil {
@@ -275,17 +276,18 @@ func ResetDNS() error {
 
 	// Primary: PowerShell (locale-independent, works without admin)
 	psCmd := fmt.Sprintf(`Set-DnsClientServerAddress -InterfaceAlias '%s' -ResetServerAddresses`, adapter)
-	out, err := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).CombinedOutput()
-	if err == nil {
+	if out, psErr := cmd.HiddenContext(ctx, "powershell", "-NoProfile", "-Command", psCmd).CombinedOutput(); psErr == nil {
 		return nil
+	} else {
+		_ = out // PowerShell failed, try netsh fallback
 	}
 
-	// Fallback: netsh
+	// Fallback: netsh via cmd /C
 	ctx2, cancel2 := context.WithTimeout(context.Background(), cmdTimeout)
 	defer cancel2()
 
-	out, err = cmd.HiddenContext(ctx2, "netsh", "interface", "ip", "set", "dns",
-		fmt.Sprintf(`name="%s"`, adapter), "dhcp").CombinedOutput()
+	netshCmd := fmt.Sprintf(`netsh interface ip set dns name="%s" dhcp`, adapter)
+	out, err := cmd.HiddenContext(ctx2, "cmd", "/C", netshCmd).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to reset DNS to DHCP: %s - %w", strings.TrimSpace(string(out)), err)
 	}

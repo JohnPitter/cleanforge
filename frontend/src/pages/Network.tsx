@@ -44,6 +44,63 @@ function getActivePresetName(currentDns: string): string | null {
   return null;
 }
 
+function SkeletonPulse({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse bg-forge-border/50 rounded ${className}`} />;
+}
+
+function NetworkSkeleton() {
+  return (
+    <div className="p-6 space-y-6 overflow-y-auto h-full">
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <SkeletonPulse className="w-6 h-6 rounded" />
+          <SkeletonPulse className="h-7 w-52" />
+        </div>
+        <SkeletonPulse className="h-3.5 w-80 mt-2" />
+      </div>
+
+      {/* Status Card */}
+      <div className="bg-forge-card border border-forge-border rounded-xl p-4 grid grid-cols-4 gap-4">
+        {["Adapter", "IP Address", "Current DNS", "Nagle"].map((label) => (
+          <div key={label}>
+            <p className="text-[10px] text-forge-muted uppercase tracking-wider">{label}</p>
+            <SkeletonPulse className="h-4 w-24 mt-1.5" />
+          </div>
+        ))}
+      </div>
+
+      {/* DNS Presets */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <SkeletonPulse className="w-4 h-4 rounded" />
+          <SkeletonPulse className="h-3.5 w-24" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-4 bg-forge-card border border-forge-border rounded-xl">
+              <SkeletonPulse className="h-4 w-20 mb-2" />
+              <SkeletonPulse className="h-3 w-36 mb-3" />
+              <SkeletonPulse className="h-2.5 w-28" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-3 gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="p-4 bg-forge-card border border-forge-border rounded-xl text-center">
+            <SkeletonPulse className="w-5 h-5 mx-auto mb-2 rounded" />
+            <SkeletonPulse className="h-3.5 w-24 mx-auto mb-1.5" />
+            <SkeletonPulse className="h-2.5 w-32 mx-auto" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Network() {
   const [status, setStatus] = useState<NetworkStatus | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
@@ -177,6 +234,8 @@ export default function Network() {
     } catch {}
     setPinging(false);
   }
+
+  if (!status) return <NetworkSkeleton />;
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
