@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { LucideIcon } from "lucide-react";
 
@@ -8,6 +9,7 @@ interface StatCardProps {
   subValue?: string;
   color?: string;
   percentage?: number;
+  children?: ReactNode;
 }
 
 export default function StatCard({
@@ -17,6 +19,7 @@ export default function StatCard({
   subValue,
   color = "text-forge-accent",
   percentage,
+  children,
 }: StatCardProps) {
   return (
     <motion.div
@@ -65,6 +68,7 @@ export default function StatCard({
           />
         </div>
       )}
+      {children && <div className="mt-3 border-t border-forge-border pt-3">{children}</div>}
     </motion.div>
   );
 }
