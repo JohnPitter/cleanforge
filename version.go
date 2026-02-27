@@ -5,7 +5,7 @@ import "strings"
 // Version is set at build time via ldflags:
 //
 //	go build -ldflags "-X main.Version=v1.2.0"
-var Version = "1.5.1"
+var Version = "1.5.2"
 
 func (a *App) GetVersion() string {
 	return strings.TrimPrefix(Version, "v")

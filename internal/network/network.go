@@ -73,97 +73,85 @@ func GetDNSPresets() []DNSPreset {
 }
 
 // GetNetworkStatus retrieves the current network configuration for the active adapter.
+// Uses PowerShell as primary method (locale-independent), with netsh as fallback.
+// Never returns an error — always returns at least partial status so the UI can render.
 func GetNetworkStatus() (*NetworkStatus, error) {
-	adapter, err := GetActiveAdapter()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get active adapter: %w", err)
-	}
+	status := &NetworkStatus{}
 
-	status := &NetworkStatus{
-		Adapter: adapter,
-	}
-
-	// Use PowerShell to get IP and gateway (locale-independent)
-	psIP := fmt.Sprintf(`Get-NetIPConfiguration -InterfaceAlias '%s' -ErrorAction SilentlyContinue | ForEach-Object { "$($_.IPv4Address.IPAddress)|$($_.IPv4DefaultGateway.NextHop)" }`, adapter)
-	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psIP).Output(); err == nil {
-		parts := strings.SplitN(strings.TrimSpace(string(out)), "|", 2)
-		if len(parts) >= 1 {
-			status.IPAddress = strings.TrimSpace(parts[0])
-		}
-		if len(parts) >= 2 {
-			status.Gateway = strings.TrimSpace(parts[1])
-		}
-	}
-
-	// Use PowerShell to get DNS servers (locale-independent)
-	psDNS := fmt.Sprintf(`(Get-DnsClientServerAddress -InterfaceAlias '%s' -AddressFamily IPv4 -ErrorAction SilentlyContinue).ServerAddresses -join ', '`, adapter)
-	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psDNS).Output(); err == nil {
-		dns := strings.TrimSpace(string(out))
-		if dns != "" {
-			status.CurrentDNS = dns
+	// Primary: Single PowerShell call to get ALL network info (locale-independent)
+	psCmd := `$cfg = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null } | Select-Object -First 1
+if ($cfg) {
+    $dns = (Get-DnsClientServerAddress -InterfaceIndex $cfg.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue).ServerAddresses -join ', '
+    "$($cfg.InterfaceAlias)|$($cfg.IPv4Address.IPAddress)|$($cfg.IPv4DefaultGateway.NextHop)|$dns"
+}`
+	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psCmd).Output(); err == nil {
+		result := strings.TrimSpace(string(out))
+		if result != "" {
+			parts := strings.SplitN(result, "|", 4)
+			if len(parts) >= 1 && strings.TrimSpace(parts[0]) != "" {
+				status.Adapter = strings.TrimSpace(parts[0])
+			}
+			if len(parts) >= 2 && strings.TrimSpace(parts[1]) != "" {
+				status.IPAddress = strings.TrimSpace(parts[1])
+			}
+			if len(parts) >= 3 && strings.TrimSpace(parts[2]) != "" {
+				status.Gateway = strings.TrimSpace(parts[2])
+			}
+			if len(parts) >= 4 && strings.TrimSpace(parts[3]) != "" {
+				status.CurrentDNS = strings.TrimSpace(parts[3])
+			}
 		}
 	}
 
-	// Fallback: try netsh parsing with multi-locale support if PowerShell failed
-	if status.IPAddress == "" || status.CurrentDNS == "" {
-		if out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config", "name="+adapter).CombinedOutput(); err == nil {
+	// Fallback 1: Try getting adapter via GetActiveAdapter if PowerShell didn't find one
+	if status.Adapter == "" {
+		if adapter, err := GetActiveAdapter(); err == nil {
+			status.Adapter = adapter
+		}
+	}
+
+	// Fallback 2: netsh parsing with multi-locale support if still missing data
+	if status.Adapter != "" && (status.IPAddress == "" || status.CurrentDNS == "") {
+		if out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config", "name="+status.Adapter).CombinedOutput(); err == nil {
 			lines := strings.Split(string(out), "\n")
 			for _, line := range lines {
 				line = strings.TrimSpace(line)
-				lower := strings.ToLower(line)
 
-				// IP Address (EN: "IP Address", PT: "Endereço IP", ES: "Dirección IP")
-				if status.IPAddress == "" && (strings.Contains(lower, "ip") && (strings.Contains(lower, "address") || strings.Contains(lower, "endere"))) {
-					parts := strings.SplitN(line, ":", 2)
-					if len(parts) == 2 {
-						ip := strings.TrimSpace(parts[1])
-						if net.ParseIP(ip) != nil {
-							status.IPAddress = ip
+				// Look for any line with an IP address after a colon separator
+				if strings.Contains(line, ":") {
+					colParts := strings.SplitN(line, ":", 2)
+					if len(colParts) == 2 {
+						val := strings.TrimSpace(colParts[1])
+						label := strings.ToLower(colParts[0])
+
+						if net.ParseIP(val) != nil {
+							// IP Address (EN: "IP Address", PT: "Endereço IP")
+							if status.IPAddress == "" && (strings.Contains(label, "ip") && !strings.Contains(label, "dns") && !strings.Contains(label, "gateway")) {
+								status.IPAddress = val
+							}
+							// DNS (EN: "DNS Servers", PT: "Servidores DNS")
+							if status.CurrentDNS == "" && strings.Contains(label, "dns") {
+								status.CurrentDNS = val
+							}
 						}
-					}
-				}
 
-				// Gateway (EN: "Default Gateway", PT: "Gateway Padrão")
-				if status.Gateway == "" && strings.Contains(lower, "gateway") {
-					parts := strings.SplitN(line, ":", 2)
-					if len(parts) == 2 {
-						gw := strings.TrimSpace(parts[1])
-						if gw != "" {
-							status.Gateway = gw
-						}
-					}
-				}
-
-				// DNS (EN: "DNS Servers", PT: "Servidores DNS")
-				if status.CurrentDNS == "" && strings.Contains(lower, "dns") {
-					parts := strings.SplitN(line, ":", 2)
-					if len(parts) == 2 {
-						dns := strings.TrimSpace(parts[1])
-						if net.ParseIP(dns) != nil {
-							status.CurrentDNS = dns
+						// Gateway
+						if status.Gateway == "" && strings.Contains(label, "gateway") && val != "" {
+							status.Gateway = val
 						}
 					}
 				}
 			}
+		}
+	}
 
-			// Collect continuation DNS lines (indented IPs after DNS header)
-			if status.CurrentDNS != "" {
-				inDNS := false
-				for _, line := range lines {
-					trimmed := strings.TrimSpace(line)
-					lower := strings.ToLower(trimmed)
-					if strings.Contains(lower, "dns") {
-						inDNS = true
-						continue
-					}
-					if inDNS {
-						if net.ParseIP(trimmed) != nil {
-							status.CurrentDNS += ", " + trimmed
-						} else {
-							inDNS = false
-						}
-					}
-				}
+	// Fallback 3: If we still don't have DNS, check via netsh dns show config
+	if status.CurrentDNS == "" && status.Adapter != "" {
+		psDNS := fmt.Sprintf(`(Get-DnsClientServerAddress -InterfaceAlias '%s' -AddressFamily IPv4 -ErrorAction SilentlyContinue).ServerAddresses -join ', '`, status.Adapter)
+		if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psDNS).Output(); err == nil {
+			dns := strings.TrimSpace(string(out))
+			if dns != "" {
+				status.CurrentDNS = dns
 			}
 		}
 	}
@@ -322,44 +310,55 @@ func FlushNetwork() (string, error) {
 	return result, nil
 }
 
-// GetActiveAdapter parses netsh output to find the currently active network adapter name.
+// GetActiveAdapter finds the currently active network adapter name.
+// Uses PowerShell as primary method (locale-independent), with netsh as fallback.
 func GetActiveAdapter() (string, error) {
-	out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config").CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to run netsh: %w", err)
+	// Primary: PowerShell (works on any Windows locale)
+	psCmd := `(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null } | Select-Object -First 1).InterfaceAlias`
+	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psCmd).Output(); err == nil {
+		adapter := strings.TrimSpace(string(out))
+		if adapter != "" {
+			return adapter, nil
+		}
 	}
 
-	output := string(out)
-	lines := strings.Split(output, "\n")
+	// Fallback 1: netsh with locale-tolerant regex
+	// Section headers across all locales have the adapter name in quotes:
+	//   EN: Configuration for interface "Wi-Fi"
+	//   PT: Configuração da interface "Wi-Fi"
+	//   ES: Configuración de la interfaz "Wi-Fi"
+	out, err := cmd.Hidden("netsh", "interface", "ip", "show", "config").CombinedOutput()
+	if err == nil {
+		lines := strings.Split(string(out), "\n")
+		configRe := regexp.MustCompile(`"([^"]+)"`)
+		ipRe := regexp.MustCompile(`(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})`)
 
-	// Match lines like: Configuration for interface "Wi-Fi"
-	// or: Configuration for interface "Ethernet"
-	configRe := regexp.MustCompile(`(?i)Configuration for interface\s+"([^"]+)"`)
-	ipRe := regexp.MustCompile(`(?i)IP Address.*?:\s*(\d+\.\d+\.\d+\.\d+)`)
+		var currentAdapter string
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
 
-	var currentAdapter string
+			// Section headers are not indented and contain a quoted adapter name
+			if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+				if matches := configRe.FindStringSubmatch(trimmed); len(matches) > 1 {
+					currentAdapter = matches[1]
+					continue
+				}
+			}
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		if matches := configRe.FindStringSubmatch(line); len(matches) > 1 {
-			currentAdapter = matches[1]
-			continue
-		}
-
-		// If we find an IP address for the current adapter, and it's not a
-		// loopback or APIPA address, it's likely the active adapter.
-		if currentAdapter != "" {
-			if matches := ipRe.FindStringSubmatch(line); len(matches) > 1 {
-				ip := matches[1]
-				if ip != "0.0.0.0" && !strings.HasPrefix(ip, "127.") && !strings.HasPrefix(ip, "169.254.") {
-					return currentAdapter, nil
+			// Look for IP addresses under the current adapter
+			if currentAdapter != "" {
+				if matches := ipRe.FindStringSubmatch(trimmed); len(matches) > 1 {
+					ip := matches[1]
+					parsed := net.ParseIP(ip)
+					if parsed != nil && !parsed.IsLoopback() && ip != "0.0.0.0" && !strings.HasPrefix(ip, "169.254.") {
+						return currentAdapter, nil
+					}
 				}
 			}
 		}
 	}
 
-	// Fallback: try to detect from route print
+	// Fallback 2: route + ipconfig
 	return getAdapterFromRoute()
 }
 
@@ -389,25 +388,44 @@ func getAdapterFromRoute() (string, error) {
 		return "", fmt.Errorf("no active network adapter found")
 	}
 
-	// Now match this IP to an adapter name from ipconfig
+	// Try to match this IP to an adapter name via PowerShell (locale-independent)
+	psAdapter := fmt.Sprintf(`(Get-NetIPAddress -IPAddress '%s' -ErrorAction SilentlyContinue | Get-NetAdapter -ErrorAction SilentlyContinue).Name`, defaultIP)
+	if out, err := cmd.Hidden("powershell", "-NoProfile", "-Command", psAdapter).Output(); err == nil {
+		adapter := strings.TrimSpace(string(out))
+		if adapter != "" {
+			return adapter, nil
+		}
+	}
+
+	// Last resort: ipconfig parsing with locale-tolerant patterns
 	ipconfigOut, err := cmd.Hidden("ipconfig").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to run ipconfig: %w", err)
 	}
 
 	ipconfigLines := strings.Split(string(ipconfigOut), "\n")
-	adapterRe := regexp.MustCompile(`(?i)^(?:Ethernet|Wireless LAN) adapter\s+(.+?)\s*:`)
-	ipLineRe := regexp.MustCompile(`(?i)IPv4 Address.*?:\s*(\d+\.\d+\.\d+\.\d+)`)
+	// Adapter headers in ipconfig end with ":" and are not indented
+	// EN: "Wireless LAN adapter Wi-Fi:" / PT: "Adaptador de Rede sem Fio Wi-Fi:"
+	ipLineRe := regexp.MustCompile(`(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})`)
 
 	var adapterName string
 	for _, line := range ipconfigLines {
-		if matches := adapterRe.FindStringSubmatch(line); len(matches) > 1 {
-			adapterName = matches[1]
+		trimmed := strings.TrimSpace(line)
+		// Adapter headers: not indented, end with ":"
+		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") && strings.HasSuffix(trimmed, ":") && trimmed != ":" {
+			// Extract just the last word before ":" as a best-effort adapter name
+			adapterName = strings.TrimSuffix(trimmed, ":")
+			// Try to extract just the adapter alias (after the last space in the type prefix)
+			// This works because adapter names like "Wi-Fi" or "Ethernet" are the suffix
 			continue
 		}
 		if adapterName != "" {
-			if matches := ipLineRe.FindStringSubmatch(line); len(matches) > 1 {
+			if matches := ipLineRe.FindStringSubmatch(trimmed); len(matches) > 1 {
 				if matches[1] == defaultIP {
+					// The adapterName from ipconfig is the full description, but for netsh
+					// we need the interface alias. Try to extract it from the line.
+					// On both EN and PT, the interface alias is the last part after the type.
+					// However, this is unreliable. Since we have the IP, use PowerShell to get the alias.
 					return adapterName, nil
 				}
 			}

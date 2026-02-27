@@ -50,7 +50,10 @@ export default function Network() {
       // @ts-ignore
       const data = await window.go.main.App.GetNetworkStatus();
       setStatus(data);
-    } catch {}
+    } catch {
+      // Even if the backend call fails, show the status card with empty/fallback values
+      setStatus({ currentDns: "", nagleDisabled: false, adapter: "", ipAddress: "", gateway: "" });
+    }
   }
 
   async function setDNS(preset: DNSPreset) {

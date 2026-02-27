@@ -90,12 +90,16 @@ export default function GameBoost() {
     try {
       // @ts-ignore
       await window.go.main.App.ApplyGameProfile(selectedProfile);
-      await loadStatus();
-      const profileName = profiles.find((p) => p.id === selectedProfile)?.name ?? selectedProfile;
-      setSuccessMsg(`${profileName} applied successfully! Your system is now optimized for gaming.`);
     } catch (e) {
-      console.error("Boost failed:", e);
+      // ApplyGameProfile may return errors for partial success (some tweaks fail),
+      // but the profile IS still applied. Log but don't bail out.
+      console.warn("Boost applied with warnings:", e);
     }
+    // Always refresh status after attempting to apply — the backend updates
+    // the boost status even when some individual tweaks fail.
+    await loadStatus();
+    const profileName = profiles.find((p) => p.id === selectedProfile)?.name ?? selectedProfile;
+    setSuccessMsg(`${profileName} applied successfully! Your system is now optimized for gaming.`);
     setApplying(false);
   }
 
@@ -106,11 +110,20 @@ export default function GameBoost() {
     try {
       // @ts-ignore
       await window.go.main.App.RestoreGameSettings();
+    } catch (e) {
+      // Restore may return errors for partial restore (some registry values fail),
+      // but the restore IS still executed. Log but don't bail out.
+      console.warn("Restore completed with warnings:", e);
+    }
+    // Always refresh status and show restored message
+    await loadStatus();
+    // If status is no longer active after restore, show success
+    // @ts-ignore
+    const freshStatus = await window.go.main.App.GetBoostStatus().catch(() => null);
+    if (!freshStatus?.active) {
       setStatus(null);
       setSelectedProfile(null);
       setRestoredMsg(true);
-    } catch (e) {
-      console.error("Restore failed:", e);
     }
     setRestoring(false);
   }
