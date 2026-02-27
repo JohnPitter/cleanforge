@@ -20,12 +20,12 @@ function App() {
       {/* Title bar — spans full window width */}
       <div
         className="h-8 w-full bg-forge-surface border-b border-forge-border flex items-center shrink-0"
-        style={{ WebkitAppRegion: "drag" } as any}
+        style={{ "--wails-draggable": "drag" } as any}
       >
         <div className="flex-1 h-full" />
         <div
           className="flex items-center h-full"
-          style={{ WebkitAppRegion: "no-drag" } as any}
+          style={{ "--wails-draggable": "no-drag" } as any}
         >
           <button
             onClick={WindowMinimise}
