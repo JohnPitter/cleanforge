@@ -48,7 +48,7 @@ export default function StatCard({
           </span>
         )}
       </div>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className={`font-bold ${color} ${value.length > 16 ? "text-lg" : "text-2xl"}`}>{value}</p>
       {subValue && (
         <p className="text-xs text-forge-muted mt-1">{subValue}</p>
       )}

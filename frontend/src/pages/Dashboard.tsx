@@ -160,7 +160,7 @@ export default function Dashboard() {
           <StatCard
             icon={Monitor}
             label="GPU"
-            value={info?.gpuName?.split(" ").slice(0, 3).join(" ") ?? "..."}
+            value={info?.gpuName ?? "..."}
             subValue={info?.gpuDriver ? `Driver: ${info.gpuDriver}` : ""}
             color="text-forge-purple"
           >
