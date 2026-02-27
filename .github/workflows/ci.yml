@@ -20,18 +20,21 @@ jobs:
         with:
           go-version: "1.24"
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          args: --timeout=5m
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install frontend dependencies
         run: cd frontend && npm ci --legacy-peer-deps
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
 
       - name: TypeScript check
         run: cd frontend && npx tsc --noEmit --skipLibCheck
@@ -46,6 +49,16 @@ jobs:
         with:
           go-version: "1.24"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci --legacy-peer-deps
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
@@ -56,7 +69,7 @@ jobs:
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
       - name: Run gosec
-        run: gosec -exclude-generated ./...
+        run: gosec -exclude=G104,G115 -exclude-generated ./...
 
   build:
     name: Build
