@@ -33,6 +33,16 @@ const dnsPresets: DNSPreset[] = [
   { id: "quad9", name: "Quad9", primary: "9.9.9.9", secondary: "149.112.112.112", description: "Security-focused" },
 ];
 
+function getActivePresetName(currentDns: string): string | null {
+  if (!currentDns) return null;
+  for (const preset of dnsPresets) {
+    if (currentDns.includes(preset.primary)) {
+      return preset.name;
+    }
+  }
+  return null;
+}
+
 export default function Network() {
   const [status, setStatus] = useState<NetworkStatus | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
@@ -141,7 +151,22 @@ export default function Network() {
           </div>
           <div>
             <p className="text-[10px] text-forge-muted uppercase tracking-wider">Current DNS</p>
-            <p className="text-sm font-mono text-forge-text">{status.currentDns || "DHCP"}</p>
+            {(() => {
+              const presetName = getActivePresetName(status.currentDns);
+              if (presetName) {
+                return (
+                  <div>
+                    <p className="text-sm font-semibold text-forge-accent">{presetName}</p>
+                    <p className="text-[10px] font-mono text-forge-muted">{status.currentDns}</p>
+                  </div>
+                );
+              }
+              return (
+                <p className="text-sm font-mono text-forge-text">
+                  {status.currentDns || "DHCP (Automatic)"}
+                </p>
+              );
+            })()}
           </div>
           <div>
             <p className="text-[10px] text-forge-muted uppercase tracking-wider">Nagle</p>

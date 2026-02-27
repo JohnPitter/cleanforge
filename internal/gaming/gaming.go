@@ -931,21 +931,22 @@ func (g *GameBooster) GetBoostStatus() *BoostStatus {
 }
 
 // RestoreAll restores the original system state from backup.
+// Always clears the in-memory boost state regardless of restore errors,
+// so the user can re-apply or see the boost as inactive.
 func (g *GameBooster) RestoreAll() error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	if err := g.RestoreOriginalState(); err != nil {
-		return err
-	}
+	// Attempt to restore original settings from backup
+	restoreErr := g.RestoreOriginalState()
 
-	// Re-enable services that were stopped
+	// Always re-enable services that were stopped (even if restore had errors)
 	_ = cmd.Hidden("sc", "start", "SysMain").Run()
 	_ = cmd.Hidden("sc", "start", "WSearch").Run()
 
-	// Clear state
+	// Always clear state so the UI reflects boost as inactive
 	g.status = BoostStatus{}
 	g.appliedTweaks = make(map[string]bool)
 
-	return nil
+	return restoreErr
 }
